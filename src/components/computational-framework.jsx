@@ -122,14 +122,19 @@ const ComputationalNode = ({
   }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ]);
 
   const handleNodeDragStart = (e) => {
-    if (e.button !== 0) return; // Only handle left click
-    e.stopPropagation(); // Prevent background click from clearing selection
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
     
     const rect = nodeRef.current.getBoundingClientRect();
     const startPos = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     };
+
+    dragStartPos.current = startPos;
+    setIsDragging(true);
+    onSelect(node.id, e.shiftKey);
 
     const handleMove = (moveEvent) => {
       const newX = moveEvent.clientX - startPos.x;
@@ -138,14 +143,20 @@ const ComputationalNode = ({
     };
 
     const handleUp = () => {
+      setIsDragging(false);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
 
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
+  };
 
-    onSelect(node.id, e.shiftKey);
+  // Add input focus handler
+  const handleInputFocus = (e) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    onSelect(null); // Clear selection when focusing input
   };
 
   const handleNodeDrag = (e) => {
@@ -188,7 +199,7 @@ const ComputationalNode = ({
   return (
     <Card 
       ref={nodeRef}
-      className={`absolute w-80 shadow-lg ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+      className={`absolute w-80 shadow-lg select-none ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
       style={{ 
         left: position.x,
         top: position.y,
@@ -196,9 +207,9 @@ const ComputationalNode = ({
         backgroundColor: isSelected ? '#f0f9ff' : 'white'
       }}
       onMouseDown={handleNodeDragStart}
-      onMouseMove={handleNodeDrag}
-      onMouseUp={handleNodeDragEnd}
-      onMouseLeave={handleNodeDragEnd}
+      // onMouseMove={handleNodeDrag}
+      // onMouseUp={handleNodeDragEnd}
+      // onMouseLeave={handleNodeDragEnd}
     >
       <div className="flex justify-between items-center p-4 border-b">
         {isEditingName ? (
@@ -209,6 +220,7 @@ const ComputationalNode = ({
             onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
             className="h-8 w-40"
             autoFocus
+            onFocus={handleInputFocus}
           />
         ) : (
           <div className="flex items-center gap-2">
@@ -387,6 +399,20 @@ const ComputationalFramework = () => {
     setNextNodeId(prevId => prevId + 1);
   }, [nextNodeId]);
 
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      if (showMenu !== null) {
+        const menuNode = nodes.find(n => n.id === showMenu);
+        if (menuNode && !e.target.closest(`[data-node-id="${menuNode.id}"]`)) {
+          setShowMenu(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleGlobalClick);
+    return () => document.removeEventListener('mousedown', handleGlobalClick);
+  }, [showMenu, nodes]);
+
   const updateNode = useCallback((id, updatedNode) => {
     setNodes(prevNodes => 
       prevNodes.map(node => node.id === id ? updatedNode : node)
@@ -503,7 +529,7 @@ const ComputationalFramework = () => {
   // Handle keyboard events for deletion
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodes.size > 0) {
+      if ((e.key === 'Delete' /*|| e.key === 'Backspace'*/) && selectedNodes.size > 0) {
         // Delete all selected nodes
         setNodes(prevNodes => prevNodes.filter(node => !selectedNodes.has(node.id)));
         setConnections(prevConns => 
@@ -628,6 +654,7 @@ const ComputationalFramework = () => {
             connections={connections}
             createConnection={createConnection}
             position={node.position}
+            data-node-id={node.id}
             onPositionChange={(id, pos) => {
               if (selectedNodes.has(id)) {
                 const dx = pos.x - node.position.x;
