@@ -122,33 +122,29 @@ const ComputationalNode = ({
   }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ]);
 
   const handleNodeDragStart = (e) => {
-    if (e.button !== 0) return;
-    if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+    if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
     
     e.stopPropagation();
     e.preventDefault();
     
-    const rect = nodeRef.current.getBoundingClientRect();
-    dragStartPos.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-      nodeX: position.x,
-      nodeY: position.y
-    };
+    // Store initial positions
+    const initialMouseX = e.clientX;
+    const initialMouseY = e.clientY;
+    const initialNodeX = position.x;
+    const initialNodeY = position.y;
     
     setIsDragging(true);
     onSelect(node.id, e.shiftKey);
   
     const handleMove = (moveEvent) => {
-      if (!isDragging) return;
       moveEvent.preventDefault();
       
-      const dx = moveEvent.clientX - dragStartPos.current.x - rect.left;
-      const dy = moveEvent.clientY - dragStartPos.current.y - rect.top;
+      const dx = moveEvent.clientX - initialMouseX;
+      const dy = moveEvent.clientY - initialMouseY;
       
       onPositionChange(node.id, {
-        x: dragStartPos.current.nodeX + dx,
-        y: dragStartPos.current.nodeY + dy
+        x: initialNodeX + dx,
+        y: initialNodeY + dy
       });
     };
   
@@ -156,22 +152,13 @@ const ComputationalNode = ({
       setIsDragging(false);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('selectstart', preventDefault);
     };
   
+    const preventDefault = (e) => e.preventDefault();
+    window.addEventListener('selectstart', preventDefault);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
-  };
-
-  const handleConnectionDragStart = (e) => {
-    e.dataTransfer.setData('sourceNodeId', node.id.toString());
-  };
-
-  const handleInputDrop = (e, inputName) => {
-    e.preventDefault();
-    const sourceNodeId = parseInt(e.dataTransfer.getData('sourceNodeId'));
-    if (sourceNodeId !== node.id) {
-      createConnection(sourceNodeId, node.id, inputName);
-    }
   };
 
   const addInput = () => {
@@ -187,16 +174,22 @@ const ComputationalNode = ({
     }
   };
 
+  const handleConnectionDragStart = (e) => {
+    e.dataTransfer.setData('sourceNodeId', node.id.toString());
+  };
+
   return (
     <Card 
       ref={nodeRef}
-      className={`absolute w-80 shadow-lg select-none ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+      className="absolute w-80 shadow-lg"
       style={{ 
         left: position.x,
         top: position.y,
         cursor: isDragging ? 'grabbing' : 'grab',
         backgroundColor: isSelected ? '#f0f9ff' : 'white',
-        touchAction: 'none',
+        WebkitUserSelect: 'none',
+        MozUserSelect: 'none',
+        msUserSelect: 'none',
         userSelect: 'none'
       }}
       onMouseDown={handleNodeDragStart}
