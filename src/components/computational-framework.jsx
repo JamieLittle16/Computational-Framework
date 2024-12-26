@@ -123,52 +123,43 @@ const ComputationalNode = ({
 
   const handleNodeDragStart = (e) => {
     if (e.button !== 0) return;
+    if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+    
     e.stopPropagation();
-    e.preventDefault(); // Prevent text selection
+    e.preventDefault();
     
     const rect = nodeRef.current.getBoundingClientRect();
-    const startPos = {
+    dragStartPos.current = {
       x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      y: e.clientY - rect.top,
+      nodeX: position.x,
+      nodeY: position.y
     };
-
-    dragStartPos.current = startPos;
+    
     setIsDragging(true);
     onSelect(node.id, e.shiftKey);
-
+  
     const handleMove = (moveEvent) => {
-      const newX = moveEvent.clientX - startPos.x;
-      const newY = moveEvent.clientY - startPos.y;
-      onPositionChange(node.id, { x: newX, y: newY });
+      if (!isDragging) return;
+      moveEvent.preventDefault();
+      
+      const dx = moveEvent.clientX - dragStartPos.current.x - rect.left;
+      const dy = moveEvent.clientY - dragStartPos.current.y - rect.top;
+      
+      onPositionChange(node.id, {
+        x: dragStartPos.current.nodeX + dx,
+        y: dragStartPos.current.nodeY + dy
+      });
     };
-
+  
     const handleUp = () => {
       setIsDragging(false);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-
+  
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
-  };
-
-  // Add input focus handler
-  const handleInputFocus = (e) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    onSelect(null); // Clear selection when focusing input
-  };
-
-  const handleNodeDrag = (e) => {
-    if (isDragging) {
-      const newX = e.clientX - dragStartPos.current.x;
-      const newY = e.clientY - dragStartPos.current.y;
-      onPositionChange(node.id, { x: newX, y: newY });
-    }
-  };
-
-  const handleNodeDragEnd = () => {
-    setIsDragging(false);
   };
 
   const handleConnectionDragStart = (e) => {
@@ -204,13 +195,12 @@ const ComputationalNode = ({
         left: position.x,
         top: position.y,
         cursor: isDragging ? 'grabbing' : 'grab',
-        backgroundColor: isSelected ? '#f0f9ff' : 'white'
+        backgroundColor: isSelected ? '#f0f9ff' : 'white',
+        touchAction: 'none',
+        userSelect: 'none'
       }}
       onMouseDown={handleNodeDragStart}
-      // onMouseMove={handleNodeDrag}
-      // onMouseUp={handleNodeDragEnd}
-      // onMouseLeave={handleNodeDragEnd}
-    >
+  >
       <div className="flex justify-between items-center p-4 border-b">
         {isEditingName ? (
           <Input
