@@ -137,7 +137,7 @@ const ComputationalNode = ({
   }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ]);
 
   const handleNodeDragStart = (e) => {
-    if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button') || isDraggingConnection) return;
+    if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
     
     e.stopPropagation();
     e.preventDefault();
