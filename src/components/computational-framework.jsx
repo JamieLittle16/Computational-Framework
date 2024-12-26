@@ -29,11 +29,26 @@ const ComputationalNode = ({
   const [nodeName, setNodeName] = useState(`Node ${node.id}`);
   const [formulaError, setFormulaError] = useState('');
   const [newInputName, setNewInputName] = useState('');
+  const [isDraggingConnection, setIsDraggingConnection] = useState(false);
   const nodeRef = useRef(null);
-  const dragStartPos = useRef({ x: 0, y: 0 });
   const evaluationDepth = useRef(0);
   const MAX_EVALUATION_DEPTH = 100;
 
+
+  // Connection handling
+  const handleConnectionStart = (e) => {
+    e.stopPropagation();
+    setIsDraggingConnection(true);
+    e.dataTransfer.setData('sourceNodeId', node.id.toString());
+  };
+
+  const handleInputDrop = (e, inputName) => {
+    e.preventDefault();
+    const sourceNodeId = parseInt(e.dataTransfer.getData('sourceNodeId'));
+    if (sourceNodeId !== node.id) { // Prevent self-connection
+      createConnection(sourceNodeId, node.id, inputName);
+    }
+  };
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -122,12 +137,11 @@ const ComputationalNode = ({
   }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ]);
 
   const handleNodeDragStart = (e) => {
-    if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+    if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button') || isDraggingConnection) return;
     
     e.stopPropagation();
     e.preventDefault();
     
-    // Store initial positions
     const initialMouseX = e.clientX;
     const initialMouseY = e.clientY;
     const initialNodeX = position.x;
@@ -138,10 +152,8 @@ const ComputationalNode = ({
   
     const handleMove = (moveEvent) => {
       moveEvent.preventDefault();
-      
       const dx = moveEvent.clientX - initialMouseX;
       const dy = moveEvent.clientY - initialMouseY;
-      
       onPositionChange(node.id, {
         x: initialNodeX + dx,
         y: initialNodeY + dy
@@ -152,11 +164,8 @@ const ComputationalNode = ({
       setIsDragging(false);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
-      window.removeEventListener('selectstart', preventDefault);
     };
   
-    const preventDefault = (e) => e.preventDefault();
-    window.addEventListener('selectstart', preventDefault);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   };
@@ -193,7 +202,7 @@ const ComputationalNode = ({
         userSelect: 'none'
       }}
       onMouseDown={handleNodeDragStart}
-  >
+    >
       <div className="flex justify-between items-center p-4 border-b">
         {isEditingName ? (
           <Input
@@ -260,9 +269,10 @@ const ComputationalNode = ({
               Q Value: {isNaN(node.q) ? '0' : node.q.toFixed(2)}
             </label>
             <div 
-              className="w-4 h-4 bg-blue-500 rounded-full cursor-grab hover:bg-blue-600 transition-colors"
+              className="w-4 h-4 bg-blue-500 rounded-full cursor-pointer hover:bg-blue-600 transition-colors"
               draggable
-              onDragStart={handleConnectionDragStart}
+              onMouseDown={(e) => e.stopPropagation()}
+              onDragStart={handleConnectionStart}
             />
           </div>
         </div>
@@ -273,9 +283,10 @@ const ComputationalNode = ({
             {Object.entries(node.inputs).map(([name, input]) => (
               <div key={name} className="flex items-center gap-2">
                 <div
-                  className="w-4 h-4 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
+                  className="w-4 h-4 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors cursor-pointer"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleInputDrop(e, name)}
+                  onMouseDown={(e) => e.stopPropagation()}
                 />
                 <Input
                   type="number"
@@ -293,6 +304,7 @@ const ComputationalNode = ({
                   disabled={input.isConnected}
                   className="h-8"
                   placeholder="0"
+                  onMouseDown={(e) => e.stopPropagation()}
                 />
                 <span className="font-medium min-w-[20px]">{name}</span>
                 <Button
@@ -599,11 +611,12 @@ const ComputationalFramework = () => {
             const sourceNode = nodes.find(n => n.id === conn.sourceId);
             const targetNode = nodes.find(n => n.id === conn.targetId);
             if (sourceNode && targetNode) {
-              const sourceX = sourceNode.position.x + 320;
-              const sourceY = sourceNode.position.y + 64;
+              const sourceX = sourceNode.position.x + 320; // Output dot position
+              const sourceY = sourceNode.position.y + 64;  // Adjusted for header height
               const targetX = targetNode.position.x;
               const targetY = targetNode.position.y + 64;
               
+              // Calculate control points for smoother curve
               const dx = targetX - sourceX;
               const controlX = Math.abs(dx) * 0.5;
               
