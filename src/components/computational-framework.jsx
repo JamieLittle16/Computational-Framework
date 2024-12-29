@@ -1,4 +1,4 @@
-"use client";
+"use client"; // MOVEMENT BUG SELECTING NODE THAT IS ALREADY SELECTED
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -190,7 +190,7 @@ const ComputationalNode = ({
   return (
     <Card 
       ref={nodeRef}
-      className="absolute w-80 shadow-lg"
+      className="absolute w-80 shadow-lg z-0"
       style={{ 
         left: position.x,
         top: position.y,
@@ -549,6 +549,7 @@ const ComputationalFramework = () => {
 
   // Update the node selection handler
   const handleNodeSelect = (nodeId, isShiftKey) => {
+
     setSelectedNodes(prev => {
       const newSelection = new Set(prev);
       if (isShiftKey) {
