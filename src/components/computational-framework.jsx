@@ -205,7 +205,7 @@ const ComputationalNode = ({
   return (
     <Card 
       ref={nodeRef}
-      className="absolute w-80 shadow-lg z-0"
+      className="absolute w-80 shadow-lg z-10" // Changed from z-0 to z-10
       style={{ 
         left: position.x,
         top: position.y,
@@ -640,18 +640,34 @@ const ComputationalFramework = () => {
         />
       </div>
 
-      <div style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}>
-        <svg className="absolute inset-0 pointer-events-none z-0">
+      <div 
+        style={{ 
+          transform: `translate(${offset.x}px, ${offset.y}px)`,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%'
+        }}
+      >
+        <svg 
+          className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
+          style={{
+            minWidth: '100%',
+            minHeight: '100%',
+            width: '100%',
+            height: '100%'
+          }}
+        >
           {connections.map((conn, idx) => {
             const sourceNode = nodes.find(n => n.id === conn.sourceId);
             const targetNode = nodes.find(n => n.id === conn.targetId);
             if (sourceNode && targetNode) {
-              const sourceX = sourceNode.position.x + 320; // Output dot position
-              const sourceY = sourceNode.position.y + 64;  // Adjusted for header height
+              const sourceX = sourceNode.position.x + 320;
+              const sourceY = sourceNode.position.y + 64;
               const targetX = targetNode.position.x;
               const targetY = targetNode.position.y + 64;
               
-              // Calculate control points for smoother curve
               const dx = targetX - sourceX;
               const controlX = Math.abs(dx) * 0.5;
               
