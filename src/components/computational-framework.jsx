@@ -171,8 +171,12 @@ const ComputationalNode = ({
       });
     };
   
-    const handleUp = () => {
+    const handleUp = (upEvent) => {
       setIsDragging(false);
+      // Clear selection on any mouse up unless shift is pressed
+      if (!upEvent.shiftKey) {
+        onSelect(node.id, false);
+      }
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
