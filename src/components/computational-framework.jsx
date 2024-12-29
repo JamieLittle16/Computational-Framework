@@ -102,10 +102,11 @@ const ComputationalNode = ({
     setIsEditingName(true);
   };
 
-  // Close menu when clicking outside
+  const menuRef = useRef(null);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (nodeRef.current && !nodeRef.current.contains(event.target)) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowMenu(false);
       }
     };
@@ -247,7 +248,7 @@ const ComputationalNode = ({
   return (
     <Card 
       ref={nodeRef}
-      className="absolute w-80 shadow-lg z-10" // Changed from z-0 to z-10
+      className="absolute w-80 shadow-lg z-10"
       style={{ 
         left: position.x,
         top: position.y,
@@ -294,38 +295,46 @@ const ComputationalNode = ({
           </Button>
         </div>
       )}
-        <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8" 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMenu(!showMenu);
-            }}
-          >
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-          {showMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md border shadow-lg z-10">
-              <Button
-                variant="ghost"
-                className="w-full justify-start px-3 py-2 text-sm"
-                onClick={() => duplicateNode(node)}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Duplicate
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start px-3 py-2 text-sm text-red-600 hover:text-red-700"
-                onClick={() => deleteNode(node.id)}
-              >
-                <Trash className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </div>
-          )}
+        <div className="relative" ref={menuRef}>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8" 
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenu(!showMenu);
+          }}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+        {showMenu && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md border shadow-lg z-50">
+            <Button
+              variant="ghost"
+              className="w-full justify-start px-3 py-2 text-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                duplicateNode(node);
+                setShowMenu(false);
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start px-3 py-2 text-sm text-red-600 hover:text-red-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteNode(node.id);
+                setShowMenu(false);
+              }}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </div>
+        )}
         </div>
       </div>
 
@@ -447,6 +456,9 @@ const ComputationalFramework = () => {
   const [showMenu, setShowMenu] = useState(null);
   const containerRef = useRef(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const [selectionBox, setSelectionBox] = useState(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState(null);
 
   const [settings, setSettings] = useState({
     initialQ: 0,
@@ -474,19 +486,49 @@ const ComputationalFramework = () => {
   }, [nextNodeId, offset, settings.initialQ]);
 
 
-  useEffect(() => {
-    const handleGlobalClick = (e) => {
-      if (showMenu !== null) {
-        const menuNode = nodes.find(n => n.id === showMenu);
-        if (menuNode && !e.target.closest(`[data-node-id="${menuNode.id}"]`)) {
-          setShowMenu(null);
+  const saveSetup = () => {
+    const setup = {
+      nodes: nodes.map(node => ({
+        ...node,
+        position: {
+          x: node.position.x - offset.x,
+          y: node.position.y - offset.y
         }
-      }
+      })),
+      connections,
+      nextNodeId,
+      settings
     };
+    const blob = new Blob([JSON.stringify(setup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'computational-setup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-    document.addEventListener('mousedown', handleGlobalClick);
-    return () => document.removeEventListener('mousedown', handleGlobalClick);
-  }, [showMenu, nodes]);
+  const loadSetup = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const setup = JSON.parse(e.target.result);
+          setNodes(setup.nodes);
+          setConnections(setup.connections);
+          setNextNodeId(setup.nextNodeId);
+          setOffset({ x: 0, y: 0 });
+          if (setup.settings) {
+            setSettings(setup.settings);
+          }
+        } catch (error) {
+          console.error('Error loading setup:', error);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
   const updateNode = useCallback((id, updatedNode) => {
     setNodes(prevNodes => 
@@ -541,95 +583,6 @@ const ComputationalFramework = () => {
     );
   }, []);
 
-  const handleMouseDown = (e) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      setIsPanning(true);
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    }
-  };
-
-  const handleMouseMove = (e) => {
-    if (isPanning) {
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
-
-  const saveSetup = () => {
-    const setup = {
-      nodes: nodes.map(node => ({
-        ...node,
-        position: {
-          x: node.position.x - offset.x,
-          y: node.position.y - offset.y
-        }
-      })),
-      connections,
-      nextNodeId,
-      settings
-    };
-    const blob = new Blob([JSON.stringify(setup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'computational-setup.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const loadSetup = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const setup = JSON.parse(e.target.result);
-          setNodes(setup.nodes);
-          setConnections(setup.connections);
-          setNextNodeId(setup.nextNodeId);
-          setOffset({ x: 0, y: 0 });
-          if (setup.settings) {
-            setSettings(setup.settings);
-          }
-        } catch (error) {
-          console.error('Error loading setup:', error);
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  // Handle keyboard events for deletion
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.key === 'Delete' /*|| e.key === 'Backspace'*/) && selectedNodes.size > 0) {
-        // Delete all selected nodes
-        setNodes(prevNodes => prevNodes.filter(node => !selectedNodes.has(node.id)));
-        setConnections(prevConns => 
-          prevConns.filter(conn => 
-            !selectedNodes.has(conn.sourceId) && !selectedNodes.has(conn.targetId)
-          )
-        );
-        setSelectedNodes(new Set());
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodes]);
-
-  // Handle background click to clear selection
-  const handleBackgroundClick = (e) => {
-    if (e.target === containerRef.current) {
-      setSelectedNodes(new Set());
-    }
-  };
 
   // Update the node selection handler
   const handleNodeSelect = (nodeId, isShiftKey) => {
@@ -656,14 +609,153 @@ const ComputationalFramework = () => {
     });
   };
 
+   // Calculate workspace size based on node positions
+   const calculateWorkspaceSize = useCallback(() => {
+    if (nodes.length === 0) return { width: '100%', height: '100%' };
+    
+    const positions = nodes.map(node => ({
+      x: node.position.x,
+      y: node.position.y
+    }));
+    
+    const minX = Math.min(...positions.map(p => p.x));
+    const maxX = Math.max(...positions.map(p => p.x));
+    const minY = Math.min(...positions.map(p => p.y));
+    const maxY = Math.max(...positions.map(p => p.y));
+    
+    const width = Math.max(window.innerWidth, maxX - minX + 800);
+    const height = Math.max(window.innerHeight, maxY - minY + 600);
+    
+    return { width: `${width}px`, height: `${height}px` };
+  }, [nodes]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Copy selected nodes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const selectedNodesList = nodes.filter(node => selectedNodes.has(node.id));
+        if (selectedNodesList.length > 0) {
+          localStorage.setItem('copiedNodes', JSON.stringify(selectedNodesList));
+        }
+      }
+      
+      // Paste nodes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        const copiedNodes = JSON.parse(localStorage.getItem('copiedNodes') || '[]');
+        if (copiedNodes.length > 0) {
+          const offset = { x: 50, y: 50 }; // Offset pasted nodes
+          const idMapping = {};
+          
+          const newNodes = copiedNodes.map(node => {
+            const newId = nextNodeId + (idMapping[node.id] || Object.keys(idMapping).length);
+            idMapping[node.id] = newId;
+            
+            return {
+              ...node,
+              id: newId,
+              position: {
+                x: node.position.x + offset.x,
+                y: node.position.y + offset.y
+              }
+            };
+          });
+          
+          setNodes(prev => [...prev, ...newNodes]);
+          setNextNodeId(prev => prev + newNodes.length);
+          
+          // Select newly pasted nodes
+          setSelectedNodes(new Set(newNodes.map(n => n.id)));
+        }
+      }
+
+      // Delete selected nodes
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodes.size > 0) {
+        setNodes(prevNodes => prevNodes.filter(node => !selectedNodes.has(node.id)));
+        setConnections(prevConns => 
+          prevConns.filter(conn => 
+            !selectedNodes.has(conn.sourceId) && !selectedNodes.has(conn.targetId)
+          )
+        );
+        setSelectedNodes(new Set());
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, selectedNodes, nextNodeId]);
+
+  // Handle selection box
+  const handleMouseDown = (e) => {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      setIsPanning(true);
+      lastMousePos.current = { x: e.clientX, y: e.clientY };
+    } else if (e.button === 0 && e.target === containerRef.current) {
+      setIsSelecting(true);
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left - offset.x;
+      const y = e.clientY - rect.top - offset.y;
+      setSelectionStart({ x, y });
+      setSelectionBox({ x, y, width: 0, height: 0 });
+      if (!e.shiftKey) {
+        setSelectedNodes(new Set());
+      }
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (isPanning) {
+      const dx = e.clientX - lastMousePos.current.x;
+      const dy = e.clientY - lastMousePos.current.y;
+      setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      lastMousePos.current = { x: e.clientX, y: e.clientY };
+    } else if (isSelecting && selectionStart) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left - offset.x;
+      const currentY = e.clientY - rect.top - offset.y;
+      
+      setSelectionBox({
+        x: Math.min(selectionStart.x, currentX),
+        y: Math.min(selectionStart.y, currentY),
+        width: Math.abs(currentX - selectionStart.x),
+        height: Math.abs(currentY - selectionStart.y)
+      });
+      
+      // Update selected nodes based on selection box
+      const selected = new Set();
+      nodes.forEach(node => {
+        const nodeRect = {
+          left: node.position.x,
+          right: node.position.x + 320,
+          top: node.position.y,
+          bottom: node.position.y + 200
+        };
+        
+        if (nodeRect.left < selectionBox.x + selectionBox.width &&
+            nodeRect.right > selectionBox.x &&
+            nodeRect.top < selectionBox.y + selectionBox.height &&
+            nodeRect.bottom > selectionBox.y) {
+          selected.add(node.id);
+        }
+      });
+      setSelectedNodes(selected);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+    setIsSelecting(false);
+    setSelectionBox(null);
+    setSelectionStart(null);
+  };
+
+  const workspaceSize = calculateWorkspaceSize();
+
   return (
     <div 
       ref={containerRef}
       className="relative w-full h-screen bg-gray-50 overflow-hidden"
-      onMouseDown={(e) => {
-        handleBackgroundClick(e);
-        handleMouseDown(e);
-      }}
+      onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -709,21 +801,14 @@ const ComputationalFramework = () => {
       <div 
         style={{ 
           transform: `translate(${offset.x}px, ${offset.y}px)`,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%'
+          width: workspaceSize.width,
+          height: workspaceSize.height,
+          position: 'absolute'
         }}
       >
         <svg 
-          className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
-          style={{
-            minWidth: '100%',
-            minHeight: '100%',
-            width: '100%',
-            height: '100%'
-          }}
+          className="absolute top-0 left-0 w-full h-full pointer-events-none"
+          style={workspaceSize}
         >
           {connections.map((conn, idx) => {
             const sourceNode = nodes.find(n => n.id === conn.sourceId);
@@ -755,6 +840,17 @@ const ComputationalFramework = () => {
             }
             return null;
           })}
+        {selectionBox && (
+            <rect
+              x={selectionBox.x}
+              y={selectionBox.y}
+              width={selectionBox.width}
+              height={selectionBox.height}
+              fill="rgba(59, 130, 246, 0.1)"
+              stroke="rgb(59, 130, 246)"
+              strokeWidth="1"
+            />
+          )}
         </svg>
 
         {nodes.map(node => (
