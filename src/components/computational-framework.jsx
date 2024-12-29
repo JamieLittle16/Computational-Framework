@@ -49,6 +49,17 @@ const ComputationalNode = ({
       createConnection(sourceNodeId, node.id, inputName);
     }
   };
+
+  const handleInputFocus = (e) => {
+    e.stopPropagation();
+  };
+
+
+  const handleNameEdit = (e) => {
+    e.stopPropagation();
+    setIsEditingName(true);
+  };
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -204,29 +215,39 @@ const ComputationalNode = ({
       onMouseDown={handleNodeDragStart}
     >
       <div className="flex justify-between items-center p-4 border-b">
-        {isEditingName ? (
-          <Input
-            value={nodeName}
-            onChange={(e) => setNodeName(e.target.value)}
-            onBlur={() => setIsEditingName(false)}
-            onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
-            className="h-8 w-40"
-            autoFocus
-            onFocus={handleInputFocus}
-          />
-        ) : (
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-medium">{nodeName}</h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setIsEditingName(true)}
-            >
-              <Edit2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+      {isEditingName ? (
+        <Input
+          value={nodeName}
+          onChange={(e) => setNodeName(e.target.value)}
+          onBlur={() => {
+            setIsEditingName(false);
+            updateNode(node.id, { ...node, name: nodeName });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setIsEditingName(false);
+              updateNode(node.id, { ...node, name: nodeName });
+            }
+          }}
+          className="h-8 w-40"
+          autoFocus
+          onMouseDown={(e) => e.stopPropagation()}
+          onFocus={handleInputFocus}
+        />
+      ) : (
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-medium">{node.name || `Node ${node.id}`}</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={handleNameEdit}
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
         <div className="relative">
           <Button 
             variant="ghost" 
@@ -382,17 +403,26 @@ const ComputationalFramework = () => {
   const lastMousePos = useRef({ x: 0, y: 0 });
 
   const createNode = useCallback(() => {
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Calculate center position, accounting for offset
+    const centerX = (rect.width / 2) - 160 - offset.x; // 160 is half the node width
+    const centerY = (rect.height / 2) - 100 - offset.y; // 100 is approximate half height
+
+
     const newNode = {
       id: nextNodeId,
-      position: { x: 100, y: 100 },
+      position: { x: centerX, y: centerY },
       inputs: {},
       formula: '',
       useMod2: true,
-      q: 0
+      q: 0, // Initial q value
+      name: `Node ${nextNodeId}`
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
     setNextNodeId(prevId => prevId + 1);
-  }, [nextNodeId]);
+  }, [nextNodeId, offset]);
 
   useEffect(() => {
     const handleGlobalClick = (e) => {
