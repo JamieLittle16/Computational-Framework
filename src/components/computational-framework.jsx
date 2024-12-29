@@ -1,12 +1,53 @@
-"use client"; // MOVEMENT BUG SELECTING NODE THAT IS ALREADY SELECTED
+"use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MoreVertical, Plus, Trash, Copy, X, Edit2, Save, Upload } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label';
+import { Settings2, MoreVertical, Plus, Trash, Copy, X, Edit2, Save, Upload } from 'lucide-react';
 import { evaluate } from 'mathjs';
+
+// Settings component
+const SettingsPanel = ({ settings, onSettingsChange }) => {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="initialQ">Initial Q Value</Label>
+        <Input
+          id="initialQ"
+          type="number"
+          value={settings.initialQ}
+          onChange={(e) => onSettingsChange({
+            ...settings,
+            initialQ: parseFloat(e.target.value) || 0
+          })}
+        />
+        <p className="text-sm text-gray-500">Default Q value for new nodes</p>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="modBase">Mod Base</Label>
+        <Input
+          id="modBase"
+          type="number"
+          min="2"
+          value={settings.modBase}
+          onChange={(e) => {
+            const value = parseInt(e.target.value) || 2;
+            onSettingsChange({
+              ...settings,
+              modBase: Math.max(2, value)
+            });
+          }}
+        />
+        <p className="text-sm text-gray-500">Base for modular arithmetic (minimum 2)</p>
+      </div>
+    </div>
+  );
+};
 
 const ComputationalNode = ({ 
   node, 
@@ -22,7 +63,8 @@ const ComputationalNode = ({
   isSelected,
   onSelect,
   showMenu,
-  setShowMenu
+  setShowMenu,
+  settings
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -126,7 +168,7 @@ const ComputationalNode = ({
 
             let result = evaluate(currentNode.formula, scope);
             if (currentNode.useMod2) {
-              result = (result % 2);
+              result = ((result % settings.modBase) + settings.modBase) % settings.modBase;
             }
             return result;
           } catch (e) {
@@ -145,7 +187,7 @@ const ComputationalNode = ({
 
     const timeoutId = setTimeout(evaluateFormula, 100);
     return () => clearTimeout(timeoutId);
-  }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ]);
+  }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ, settings.modBase]);
 
   const handleNodeDragStart = (e) => {
     if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
@@ -387,7 +429,7 @@ const ComputationalNode = ({
             htmlFor={`mod2-${node.id}`}
             className="text-sm text-gray-700 cursor-pointer"
           >
-            Use Mod 2
+            Use Mod {settings.modBase}
           </label>
         </div>
       </CardContent>
@@ -406,14 +448,17 @@ const ComputationalFramework = () => {
   const containerRef = useRef(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
+  const [settings, setSettings] = useState({
+    initialQ: 0,
+    modBase: 2
+  });
+
   const createNode = useCallback(() => {
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
     
-    // Calculate center position, accounting for offset
-    const centerX = (rect.width / 2) - 160 - offset.x; // 160 is half the node width
-    const centerY = (rect.height / 2) - 100 - offset.y; // 100 is approximate half height
-
+    const centerX = (rect.width / 2) - 160 - offset.x;
+    const centerY = (rect.height / 2) - 100 - offset.y;
 
     const newNode = {
       id: nextNodeId,
@@ -421,12 +466,13 @@ const ComputationalFramework = () => {
       inputs: {},
       formula: '',
       useMod2: true,
-      q: 0, // Initial q value
+      q: settings.initialQ,
       name: `Node ${nextNodeId}`
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
     setNextNodeId(prevId => prevId + 1);
-  }, [nextNodeId, offset]);
+  }, [nextNodeId, offset, settings.initialQ]);
+
 
   useEffect(() => {
     const handleGlobalClick = (e) => {
@@ -525,7 +571,8 @@ const ComputationalFramework = () => {
         }
       })),
       connections,
-      nextNodeId
+      nextNodeId,
+      settings
     };
     const blob = new Blob([JSON.stringify(setup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -547,6 +594,9 @@ const ComputationalFramework = () => {
           setConnections(setup.connections);
           setNextNodeId(setup.nextNodeId);
           setOffset({ x: 0, y: 0 });
+          if (setup.settings) {
+            setSettings(setup.settings);
+          }
         } catch (error) {
           console.error('Error loading setup:', error);
         }
@@ -631,6 +681,22 @@ const ComputationalFramework = () => {
           <Upload className="h-4 w-4" />
           Load
         </Button>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Settings
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Framework Settings</SheetTitle>
+            </SheetHeader>
+            <div className="py-4">
+              <SettingsPanel settings={settings} onSettingsChange={setSettings} />
+            </div>
+          </SheetContent>
+        </Sheet>
         <input
           id="load-setup"
           type="file"
@@ -721,6 +787,7 @@ const ComputationalFramework = () => {
             onSelect={handleNodeSelect}
             showMenu={showMenu === node.id}
             setShowMenu={(show) => setShowMenu(show ? node.id : null)}
+            settings={settings}
           />
         ))}
       </div>
