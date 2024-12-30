@@ -96,7 +96,6 @@ const ComputationalNode = ({
     e.stopPropagation();
   };
 
-
   const handleNameEdit = (e) => {
     e.stopPropagation();
     setIsEditingName(true);
@@ -688,22 +687,38 @@ const ComputationalFramework = () => {
   // Handle selection box
   const handleMouseDown = (e) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      // Middle click or Alt+left click for panning
       setIsPanning(true);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } else if (e.button === 0 && e.target === containerRef.current) {
+      // Left click on background for selection
       setIsSelecting(true);
       const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - offset.x;
-      const y = e.clientY - rect.top - offset.y;
-      setSelectionStart({ x, y });
-      setSelectionBox({ x, y, width: 0, height: 0 });
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      // Store the initial position in screen coordinates
+      setSelectionStart({ 
+        x: x - offset.x, 
+        y: y - offset.y 
+      });
+      
+      // Initialize selection box
+      setSelectionBox({ 
+        x: x - offset.x, 
+        y: y - offset.y, 
+        width: 0, 
+        height: 0 
+      });
+
+      // Clear selection if shift isn't held
       if (!e.shiftKey) {
         setSelectedNodes(new Set());
       }
     }
   };
 
-  const handleMouseMove = (e) => {
+ const handleMouseMove = (e) => {
     if (isPanning) {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
@@ -714,35 +729,48 @@ const ComputationalFramework = () => {
       const currentX = e.clientX - rect.left - offset.x;
       const currentY = e.clientY - rect.top - offset.y;
       
-      setSelectionBox({
+      // Update selection box dimensions
+      const newSelectionBox = {
         x: Math.min(selectionStart.x, currentX),
         y: Math.min(selectionStart.y, currentY),
         width: Math.abs(currentX - selectionStart.x),
         height: Math.abs(currentY - selectionStart.y)
-      });
+      };
       
-      // Update selected nodes based on selection box
-      const selected = new Set();
+      setSelectionBox(newSelectionBox);
+      
+      // Check which nodes are within the selection box
+      const newSelectedNodes = new Set();
       nodes.forEach(node => {
+        // Define node boundaries
         const nodeRect = {
           left: node.position.x,
-          right: node.position.x + 320,
+          right: node.position.x + 320, // Node width
           top: node.position.y,
-          bottom: node.position.y + 200
+          bottom: node.position.y + 200 // Node height
         };
         
-        if (nodeRect.left < selectionBox.x + selectionBox.width &&
-            nodeRect.right > selectionBox.x &&
-            nodeRect.top < selectionBox.y + selectionBox.height &&
-            nodeRect.bottom > selectionBox.y) {
-          selected.add(node.id);
+        // Check if node intersects with selection box
+        if (
+          nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
+          nodeRect.right > newSelectionBox.x &&
+          nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
+          nodeRect.bottom > newSelectionBox.y
+        ) {
+          newSelectedNodes.add(node.id);
         }
       });
-      setSelectedNodes(selected);
+      
+      setSelectedNodes(newSelectedNodes);
     }
   };
 
   const handleMouseUp = () => {
+    if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
+      // If there was no drag, clear selection
+      setSelectedNodes(new Set());
+    }
+    
     setIsPanning(false);
     setIsSelecting(false);
     setSelectionBox(null);
