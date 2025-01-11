@@ -1,14 +1,12 @@
-"use client";
-
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings2, MoreVertical, Plus, Trash, Copy, X, Edit2, Save, Upload } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, X } from 'lucide-react';
 import { evaluate } from 'mathjs';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Settings component
 const SettingsPanel = ({ settings, onSettingsChange }) => {
@@ -27,7 +25,7 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
         />
         <p className="text-sm text-gray-500">Default Q value for new nodes</p>
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="modBase">Mod Base</Label>
         <Input
@@ -49,21 +47,19 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
   );
 };
 
-const ComputationalNode = ({ 
-  node, 
-  updateNode, 
-  deleteNode, 
-  duplicateNode, 
-  connections, 
-  createConnection, 
-  position, 
+const ComputationalNode = ({
+  node,
+  updateNode,
+  deleteNode,
+  duplicateNode,
+  connections,
+  createConnection,
+  position,
   onPositionChange,
   allNodes,
   updateNodeQ,
   isSelected,
   onSelect,
-  showMenu,
-  setShowMenu,
   settings
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -72,6 +68,9 @@ const ComputationalNode = ({
   const [formulaError, setFormulaError] = useState('');
   const [newInputName, setNewInputName] = useState('');
   const [isDraggingConnection, setIsDraggingConnection] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+
+
   const nodeRef = useRef(null);
   const evaluationDepth = useRef(0);
   const MAX_EVALUATION_DEPTH = 100;
@@ -101,18 +100,20 @@ const ComputationalNode = ({
     setIsEditingName(true);
   };
 
-  const menuRef = useRef(null);
+    const menuRef = useRef(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setShowMenu(false);
-      }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [setShowMenu]);
+      useEffect(() => {
+        const handleClickOutside = (event) => {
+          if (menuRef.current && !menuRef.current.contains(event.target)) {
+            setShowMenu(false);
+          }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, [setShowMenu]);
+
 
   // Get connected input value
   const getConnectedInputValue = useCallback((inputName) => {
@@ -191,18 +192,18 @@ const ComputationalNode = ({
 
   const handleNodeDragStart = (e) => {
     if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
-    
+
     e.stopPropagation();
     e.preventDefault();
-    
+
     const initialMouseX = e.clientX;
     const initialMouseY = e.clientY;
     const initialNodeX = position.x;
     const initialNodeY = position.y;
-    
+
     setIsDragging(true);
     onSelect(node.id, e.shiftKey);
-  
+
     const handleMove = (moveEvent) => {
       moveEvent.preventDefault();
       const dx = moveEvent.clientX - initialMouseX;
@@ -212,7 +213,7 @@ const ComputationalNode = ({
         y: initialNodeY + dy
       });
     };
-  
+
     const handleUp = (upEvent) => {
       setIsDragging(false);
       // Clear selection on any mouse up unless shift is pressed
@@ -222,7 +223,7 @@ const ComputationalNode = ({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  
+
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   };
@@ -244,11 +245,16 @@ const ComputationalNode = ({
     e.dataTransfer.setData('sourceNodeId', node.id.toString());
   };
 
+   const handleMenuToggle = (e) => {
+        e.stopPropagation();
+        setShowMenu(prev => !prev);
+    };
+
   return (
-    <Card 
+    <Card
       ref={nodeRef}
       className="absolute w-80 shadow-lg z-10"
-      style={{ 
+      style={{
         left: position.x,
         top: position.y,
         cursor: isDragging ? 'grabbing' : 'grab',
@@ -295,14 +301,11 @@ const ComputationalNode = ({
         </div>
       )}
         <div className="relative" ref={menuRef}>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8" 
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowMenu(!showMenu);
-          }}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={handleMenuToggle}
         >
           <MoreVertical className="h-4 w-4" />
         </Button>
@@ -343,7 +346,7 @@ const ComputationalNode = ({
             <label className="text-sm font-medium text-gray-700">
               Q Value: {isNaN(node.q) ? '0' : node.q.toFixed(2)}
             </label>
-            <div 
+            <div
               className="w-4 h-4 bg-blue-500 rounded-full cursor-pointer hover:bg-blue-600 transition-colors"
               draggable
               onMouseDown={(e) => e.stopPropagation()}
@@ -351,7 +354,7 @@ const ComputationalNode = ({
             />
           </div>
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Inputs:</label>
           <div className="space-y-2">
@@ -404,7 +407,7 @@ const ComputationalNode = ({
               placeholder="New input name"
               className="h-8"
             />
-            <Button 
+            <Button
               onClick={addInput}
               size="sm"
               className="px-3"
@@ -433,7 +436,7 @@ const ComputationalNode = ({
             checked={node.useMod2}
             onCheckedChange={(checked) => updateNode(node.id, { ...node, useMod2: checked })}
           />
-          <label 
+          <label
             htmlFor={`mod2-${node.id}`}
             className="text-sm text-gray-700 cursor-pointer"
           >
@@ -452,12 +455,12 @@ const ComputationalFramework = () => {
   const [selectedNodes, setSelectedNodes] = useState(new Set());
   const [isPanning, setIsPanning] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [showMenu, setShowMenu] = useState(null);
   const containerRef = useRef(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
-  const [selectionBox, setSelectionBox] = useState(null);
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectionStart, setSelectionStart] = useState(null);
+    const [selectionBox, setSelectionBox] = useState(null);
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [selectionStart, setSelectionStart] = useState(null);
+
 
   const [settings, setSettings] = useState({
     initialQ: 0,
@@ -467,7 +470,7 @@ const ComputationalFramework = () => {
   const createNode = useCallback(() => {
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
-    
+
     const centerX = (rect.width / 2) - 160 - offset.x;
     const centerY = (rect.height / 2) - 100 - offset.y;
 
@@ -518,7 +521,7 @@ const ComputationalFramework = () => {
           setConnections(setup.connections);
           setNextNodeId(setup.nextNodeId);
           setOffset({ x: 0, y: 0 });
-          if (setup.settings) {
+           if (setup.settings) {
             setSettings(setup.settings);
           }
         } catch (error) {
@@ -530,14 +533,14 @@ const ComputationalFramework = () => {
   };
 
   const updateNode = useCallback((id, updatedNode) => {
-    setNodes(prevNodes => 
+    setNodes(prevNodes =>
       prevNodes.map(node => node.id === id ? updatedNode : node)
     );
   }, []);
 
   const deleteNode = useCallback((id) => {
     setNodes(prevNodes => prevNodes.filter(node => node.id !== id));
-    setConnections(prevConns => 
+    setConnections(prevConns =>
       prevConns.filter(conn => conn.sourceId !== id && conn.targetId !== id)
     );
   }, []);
@@ -554,12 +557,12 @@ const ComputationalFramework = () => {
 
   const createConnection = useCallback((sourceId, targetId, inputName) => {
     setConnections(prevConns => {
-      const newConns = prevConns.filter(conn => 
+      const newConns = prevConns.filter(conn =>
         !(conn.targetId === targetId && conn.inputName === inputName)
       );
       return [...newConns, { sourceId, targetId, inputName }];
     });
-    
+
     setNodes(prevNodes => prevNodes.map(node => {
       if (node.id === targetId) {
         return {
@@ -584,7 +587,7 @@ const ComputationalFramework = () => {
 
 
   // Update the node selection handler
-  const handleNodeSelect = (nodeId, isShiftKey) => {
+ const handleNodeSelect = (nodeId, isShiftKey) => {
 
     setSelectedNodes(prev => {
       const newSelection = new Set(prev);
@@ -610,21 +613,27 @@ const ComputationalFramework = () => {
 
    // Calculate workspace size based on node positions
    const calculateWorkspaceSize = useCallback(() => {
-    if (nodes.length === 0) return { width: '100%', height: '100%' };
-    
+     if (nodes.length === 0)
+      return {
+        width: `100%`,
+        height: `100%`,
+      };
+
+
     const positions = nodes.map(node => ({
       x: node.position.x,
       y: node.position.y
     }));
-    
+
     const minX = Math.min(...positions.map(p => p.x));
     const maxX = Math.max(...positions.map(p => p.x));
     const minY = Math.min(...positions.map(p => p.y));
     const maxY = Math.max(...positions.map(p => p.y));
-    
+
     const width = Math.max(window.innerWidth, maxX - minX + 800);
     const height = Math.max(window.innerHeight, maxY - minY + 600);
-    
+
+
     return { width: `${width}px`, height: `${height}px` };
   }, [nodes]);
 
@@ -638,18 +647,20 @@ const ComputationalFramework = () => {
           localStorage.setItem('copiedNodes', JSON.stringify(selectedNodesList));
         }
       }
-      
+
       // Paste nodes
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         const copiedNodes = JSON.parse(localStorage.getItem('copiedNodes') || '[]');
         if (copiedNodes.length > 0) {
           const offset = { x: 50, y: 50 }; // Offset pasted nodes
-          const idMapping = {};
-          
+           const idMapping = {};
+
+
           const newNodes = copiedNodes.map(node => {
             const newId = nextNodeId + (idMapping[node.id] || Object.keys(idMapping).length);
             idMapping[node.id] = newId;
-            
+
+
             return {
               ...node,
               id: newId,
@@ -659,20 +670,22 @@ const ComputationalFramework = () => {
               }
             };
           });
-          
-          setNodes(prev => [...prev, ...newNodes]);
+
+
+
+           setNodes(prev => [...prev, ...newNodes]);
           setNextNodeId(prev => prev + newNodes.length);
-          
+
           // Select newly pasted nodes
-          setSelectedNodes(new Set(newNodes.map(n => n.id)));
+           setSelectedNodes(new Set(newNodes.map(n => n.id)));
         }
       }
 
       // Delete selected nodes
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodes.size > 0) {
         setNodes(prevNodes => prevNodes.filter(node => !selectedNodes.has(node.id)));
-        setConnections(prevConns => 
-          prevConns.filter(conn => 
+        setConnections(prevConns =>
+          prevConns.filter(conn =>
             !selectedNodes.has(conn.sourceId) && !selectedNodes.has(conn.targetId)
           )
         );
@@ -685,108 +698,114 @@ const ComputationalFramework = () => {
   }, [nodes, selectedNodes, nextNodeId]);
 
   // Handle selection box
-  const handleMouseDown = (e) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      // Middle click or Alt+left click for panning
-      setIsPanning(true);
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    } else if (e.button === 0 && e.target === containerRef.current) {
-      // Left click on background for selection
-      setIsSelecting(true);
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      // Store the initial position in screen coordinates
-      setSelectionStart({ 
-        x: x - offset.x, 
-        y: y - offset.y 
-      });
-      
-      // Initialize selection box
-      setSelectionBox({ 
-        x: x - offset.x, 
-        y: y - offset.y, 
-        width: 0, 
-        height: 0 
-      });
-
-      // Clear selection if shift isn't held
-      if (!e.shiftKey) {
-        setSelectedNodes(new Set());
+    const handleMouseDown = (e) => {
+       if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
+        // Middle click, Right Click or Alt+left click for panning
+        setIsPanning(true);
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+           return;
       }
-    }
-  };
 
- const handleMouseMove = (e) => {
-    if (isPanning) {
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    } else if (isSelecting && selectionStart) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const currentX = e.clientX - rect.left - offset.x;
-      const currentY = e.clientY - rect.top - offset.y;
-      
-      // Update selection box dimensions
-      const newSelectionBox = {
-        x: Math.min(selectionStart.x, currentX),
-        y: Math.min(selectionStart.y, currentY),
-        width: Math.abs(currentX - selectionStart.x),
-        height: Math.abs(currentY - selectionStart.y)
-      };
-      
-      setSelectionBox(newSelectionBox);
-      
-      // Check which nodes are within the selection box
-      const newSelectedNodes = new Set();
-      nodes.forEach(node => {
-        // Define node boundaries
-        const nodeRect = {
-          left: node.position.x,
-          right: node.position.x + 320, // Node width
-          top: node.position.y,
-          bottom: node.position.y + 200 // Node height
-        };
-        
-        // Check if node intersects with selection box
-        if (
-          nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
-          nodeRect.right > newSelectionBox.x &&
-          nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
-          nodeRect.bottom > newSelectionBox.y
-        ) {
-          newSelectedNodes.add(node.id);
+        if (e.button === 0 ) {
+              setIsSelecting(true);
+            const rect = containerRef.current.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+           setSelectionStart({
+            x: x - offset.x,
+            y: y - offset.y
+          });
+
+
+            setSelectionBox({
+              x: x - offset.x,
+              y: y - offset.y,
+              width: 0,
+              height: 0
+            });
+             if (!e.shiftKey) {
+                setSelectedNodes(new Set());
+             }
+
         }
-      });
-      
-      setSelectedNodes(newSelectedNodes);
-    }
-  };
+
+    };
+
+    const handleMouseMove = (e) => {
+        if (isPanning) {
+            const dx = e.clientX - lastMousePos.current.x;
+            const dy = e.clientY - lastMousePos.current.y;
+            setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+            return;
+        }
+
+         if (isSelecting && selectionStart) {
+          const rect = containerRef.current.getBoundingClientRect();
+          //Get mouse position with respect to the top left corner of the canvas, taking into account the offset
+          const currentX = e.clientX - rect.left - offset.x;
+          const currentY = e.clientY - rect.top - offset.y;
+
+
+
+              const newSelectionBox = {
+                  x: Math.min(selectionStart.x, currentX),
+                  y: Math.min(selectionStart.y, currentY),
+                  width: Math.abs(currentX - selectionStart.x),
+                  height: Math.abs(currentY - selectionStart.y)
+              };
+
+
+          setSelectionBox(newSelectionBox);
+
+
+            const newSelectedNodes = new Set();
+              nodes.forEach(node => {
+                const nodeRect = {
+                  left: node.position.x,
+                  right: node.position.x + 320,
+                  top: node.position.y,
+                  bottom: node.position.y + 200
+                };
+
+                 if (
+                   nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
+                   nodeRect.right > newSelectionBox.x &&
+                   nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
+                  nodeRect.bottom > newSelectionBox.y
+                 ) {
+                   newSelectedNodes.add(node.id);
+                }
+          });
+
+              setSelectedNodes(newSelectedNodes);
+         }
+    };
+
 
   const handleMouseUp = () => {
     if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
-      // If there was no drag, clear selection
       setSelectedNodes(new Set());
     }
-    
+
     setIsPanning(false);
     setIsSelecting(false);
     setSelectionBox(null);
-    setSelectionStart(null);
+      setSelectionStart(null);
+
   };
 
-  const workspaceSize = calculateWorkspaceSize();
+    const workspaceSize = calculateWorkspaceSize();
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative w-full h-screen bg-gray-50 overflow-hidden"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+        onMouseLeave={handleMouseUp}
     >
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <Button onClick={createNode} className="flex items-center gap-2">
@@ -826,48 +845,48 @@ const ComputationalFramework = () => {
         />
       </div>
 
-      <div 
-        style={{ 
-          transform: `translate(${offset.x}px, ${offset.y}px)`,
-          width: workspaceSize.width,
-          height: workspaceSize.height,
-          position: 'absolute'
-        }}
-      >
-        <svg 
-          className="absolute top-0 left-0 w-full h-full pointer-events-none"
-          style={workspaceSize}
+        <div
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px)`,
+                width: workspaceSize.width,
+                height: workspaceSize.height,
+              position: 'absolute'
+            }}
         >
-          {connections.map((conn, idx) => {
-            const sourceNode = nodes.find(n => n.id === conn.sourceId);
-            const targetNode = nodes.find(n => n.id === conn.targetId);
-            if (sourceNode && targetNode) {
-              const sourceX = sourceNode.position.x + 320;
-              const sourceY = sourceNode.position.y + 64;
-              const targetX = targetNode.position.x;
-              const targetY = targetNode.position.y + 64;
-              
-              const dx = targetX - sourceX;
-              const controlX = Math.abs(dx) * 0.5;
-              
-              return (
-                <g key={idx}>
-                  <path
-                    d={`M ${sourceX} ${sourceY} 
+            <svg
+                className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                style={workspaceSize}
+            >
+                {connections.map((conn, idx) => {
+                    const sourceNode = nodes.find(n => n.id === conn.sourceId);
+                    const targetNode = nodes.find(n => n.id === conn.targetId);
+                    if (sourceNode && targetNode) {
+                        const sourceX = sourceNode.position.x + 320;
+                        const sourceY = sourceNode.position.y + 64;
+                        const targetX = targetNode.position.x;
+                        const targetY = targetNode.position.y + 64;
+
+                        const dx = targetX - sourceX;
+                        const controlX = Math.abs(dx) * 0.5;
+
+                        return (
+                            <g key={idx}>
+                                <path
+                                    d={`M ${sourceX} ${sourceY}
                        C ${sourceX + controlX} ${sourceY},
                          ${targetX - controlX} ${targetY},
                          ${targetX} ${targetY}`}
-                    stroke="#666"
-                    strokeWidth="2"
-                    fill="none"
-                  />
-                  <circle cx={sourceX} cy={sourceY} r="4" fill="#4444ff" />
-                  <circle cx={targetX} cy={targetY} r="4" fill="#666" />
-                </g>
-              );
-            }
-            return null;
-          })}
+                                    stroke="#666"
+                                    strokeWidth="2"
+                                    fill="none"
+                                />
+                                <circle cx={sourceX} cy={sourceY} r="4" fill="#4444ff" />
+                                <circle cx={targetX} cy={targetY} r="4" fill="#666" />
+                            </g>
+                        );
+                    }
+                    return null;
+                })}
         {selectionBox && (
             <rect
               x={selectionBox.x}
@@ -879,7 +898,7 @@ const ComputationalFramework = () => {
               strokeWidth="1"
             />
           )}
-        </svg>
+            </svg>
 
         {nodes.map(node => (
           <ComputationalNode
@@ -892,25 +911,23 @@ const ComputationalFramework = () => {
             createConnection={createConnection}
             position={node.position}
             data-node-id={node.id}
-            onPositionChange={(id, pos) => {
-              if (selectedNodes.has(id)) {
+           onPositionChange={(id, pos) => {
+             if (selectedNodes.has(id)) {
                 const dx = pos.x - node.position.x;
                 const dy = pos.y - node.position.y;
-                setNodes(prevNodes => prevNodes.map(n => 
-                  selectedNodes.has(n.id) 
+                setNodes(prevNodes => prevNodes.map(n =>
+                  selectedNodes.has(n.id)
                     ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
                     : n
                 ));
               } else {
-                updateNode(id, { ...node, position: pos });
+                 updateNode(id, { ...node, position: pos });
               }
             }}
             allNodes={nodes}
             updateNodeQ={updateNodeQ}
             isSelected={selectedNodes.has(node.id)}
             onSelect={handleNodeSelect}
-            showMenu={showMenu === node.id}
-            setShowMenu={(show) => setShowMenu(show ? node.id : null)}
             settings={settings}
           />
         ))}
