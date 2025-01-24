@@ -208,7 +208,8 @@ const ComputationalNode = ({
                          return acc;
                        }, {}),
                        ...allNodes.reduce((acc, n) => {
-                         acc[n.name] = () => nodeCall(n.id);
+                           const sanitizedName = n.name.replace(/ /g, '_');
+                         acc[sanitizedName] = () => nodeCall(n.id);
                          return acc;
                         }, {})
                     };
@@ -556,7 +557,7 @@ const ComputationalFramework = () => {
       formula: '',
       useMod2: true,
       q: settings.initialQ,
-      name: `Node ${nextNodeId}`
+        name: `Node ${nextNodeId}`
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
     setNextNodeId(prevId => prevId + 1);
