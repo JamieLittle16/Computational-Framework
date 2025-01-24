@@ -43,22 +43,40 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
 
       <div className="space-y-2">
         <Label htmlFor="modBase">Mod Base</Label>
-        <Input
-          id="modBase"
-          type="number"
-          min="2"
-          value={settings.modBase}
-          onChange={(e) => {
-            const value = parseInt(e.target.value) || 2;
-            onSettingsChange({
-              ...settings,
-              modBase: Math.max(2, value)
-            });
-          }}
-        />
+          <Input
+            id="modBase"
+            type="number"
+            min="2"
+            value={settings.modBase}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 2;
+                onSettingsChange({
+                  ...settings,
+                   modBase: Math.max(2, value)
+                 });
+               }}
+           />
         <p className="text-sm text-gray-500">Base for modular arithmetic (minimum 2)</p>
       </div>
-      <div className="flex items-center gap-2"> {/* Use flexbox for alignment */}
+        <div className="space-y-2">
+          <Label htmlFor="maxEvalDepth">Max Evaluation Depth</Label>
+          <Input
+            id="maxEvalDepth"
+            type="number"
+            min="1"
+            value={settings.maxEvalDepth}
+            onChange={(e) => {
+                const value = parseInt(e.target.value) || 100;
+                onSettingsChange({
+                  ...settings,
+                    maxEvalDepth: Math.max(1, value)
+               });
+            }}
+          />
+          <p className="text-sm text-gray-500">Maximum depth of evaluation to prevent infinite loops</p>
+        </div>
+
+      <div className="flex items-center gap-2">
         <Checkbox
           id="colorMode"
           checked={settings.colorMode}
@@ -101,7 +119,6 @@ const ComputationalNode = ({
 
   const nodeRef = useRef(null);
   const evaluationDepth = useRef(0);
-  const MAX_EVALUATION_DEPTH = 100;
 
   // Connection handling
   const handleConnectionStart = (e) => {
@@ -161,7 +178,7 @@ const ComputationalNode = ({
 
         evaluationDepth.current = 0;
         const evaluateWithDepthCheck = (nodeId, visited = new Set()) => {
-          if (evaluationDepth.current > MAX_EVALUATION_DEPTH) {
+          if (evaluationDepth.current > settings.maxEvalDepth) {
             throw new Error('Maximum evaluation depth exceeded');
           }
           evaluationDepth.current++;
@@ -213,7 +230,7 @@ const ComputationalNode = ({
 
     const timeoutId = setTimeout(evaluateFormula, 100);
     return () => clearTimeout(timeoutId);
-  }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ, settings.modBase]);
+  }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ, settings.modBase, settings.maxEvalDepth]);
 
   const handleNodeDragStart = (e) => {
     if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
@@ -282,7 +299,7 @@ const ComputationalNode = ({
       const value = 1;
       const rgb = hsvToRgb(hue, saturation, value);
       return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-    }, [node.q, settings.modBase]); // Only recalculate when qValue or modBase changes
+    }, [node.q, settings.modBase, settings.colorMode]); // Only recalculate when qValue or modBase changes
 
   return (
     <Card
@@ -502,10 +519,12 @@ const ComputationalFramework = () => {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState(null);
 
-  const [settings, setSettings] = useState({
-    initialQ: 0,
-    modBase: 2
-  });
+    const [settings, setSettings] = useState({
+        initialQ: 0,
+        modBase: 2,
+        maxEvalDepth: 100,
+        colorMode: false
+    });
 
   const createNode = useCallback(() => {
     const container = containerRef.current;
@@ -560,9 +579,9 @@ const ComputationalFramework = () => {
           setConnections(setup.connections);
           setNextNodeId(setup.nextNodeId);
           setOffset({ x: 0, y: 0 });
-          if (setup.settings) {
-            setSettings(setup.settings);
-          }
+           if (setup.settings) {
+               setSettings(setup.settings);
+            }
         } catch (error) {
           console.error('Error loading setup:', error);
                   }
@@ -831,177 +850,172 @@ const ComputationalFramework = () => {
             };
 
             const handleMouseUp = () => {
-              if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
-                setSelectedNodes(new Set());
-              }
+                if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
+                  setSelectedNodes(new Set());
+                }
 
               setIsPanning(false);
               setIsSelecting(false);
               setSelectionBox(null);
               setSelectionStart(null);
             };
-                                    return (
-                                      <div
-                                         ref={containerRef}
-                                         className="relative w-full h-screen bg-gray-50 overflow-hidden"
-                                         onMouseDown={handleMouseDown}
-                                         onMouseMove={handleMouseMove}
-                                         onMouseUp={handleMouseUp}
-                                         onMouseLeave={handleMouseUp}
-                                       >
-                                        <div className="absolute top-4 left-4 z-10 flex gap-2">
-                                          <Button onClick={createNode} className="flex items-center gap-2">
-                                            <Plus className="h-4 w-4" />
-                                            Add Node
-                                          </Button>
-                                          <Button onClick={saveSetup} className="flex items-center gap-2">
-                                            <Save className="h-4 w-4" />
-                                            Save
-                                          </Button>
-                                          <Button className="flex items-center gap-2" onClick={() => document.getElementById('load-setup').click()}>
-                                            <Upload className="h-4 w-4" />
-                                            Load
-                                          </Button>
-                                          <Sheet>
-                                            <SheetTrigger asChild>
-                                              <Button className="flex items-center gap-2">
-                                                <Settings2 className="h-4 w-4" />
-                                                Settings
-                                              </Button>
-                                            </SheetTrigger>
-                                            <SheetContent>
-                                              <SheetHeader>
-                                                <SheetTitle>Framework Settings</SheetTitle>
-                                              </SheetHeader>
-                                              <div className="py-4">
-                                                <SettingsPanel settings={settings} onSettingsChange={setSettings} />
-                                              </div>
-                                            </SheetContent>
-                                          </Sheet>
-                                          <input
-                                            id="load-setup"
-                                            type="file"
-                                            accept=".json"
-                                            className="hidden"
-                                            onChange={loadSetup}
-                                          />
-                                        </div>
+            return (
+              <div
+                ref={containerRef}
+                className="relative w-full h-screen bg-gray-50 overflow-hidden"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+              >
+                <div className="absolute top-4 left-4 z-10 flex gap-2">
+                  <Button onClick={createNode} className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Node
+                  </Button>
+                  <Button onClick={saveSetup} className="flex items-center gap-2">
+                    <Save className="h-4 w-4" />
+                    Save
+                  </Button>
+                  <Button className="flex items-center gap-2" onClick={() => document.getElementById('load-setup').click()}>
+                    <Upload className="h-4 w-4" />
+                    Load
+                  </Button>
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button className="flex items-center gap-2">
+                        <Settings2 className="h-4 w-4" />
+                        Settings
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent>
+                      <SheetHeader>
+                        <SheetTitle>Framework Settings</SheetTitle>
+                      </SheetHeader>
+                      <div className="py-4">
+                        <SettingsPanel settings={settings} onSettingsChange={setSettings} />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                  <input
+                    id="load-setup"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={loadSetup}
+                  />
+                </div>
 
-                                        <div
-                                            className="absolute"
-                                            style={{
-                                              transform: `translate(${offset.x}px, ${offset.y}px)`,
-                                            }}
-                                          >
-                                            <svg
-                                                    width={workspaceSize.width}
-                                                    height={workspaceSize.height}
-                                                  >
-                                                    <defs>
-                                                                <pattern
-                                                                  id="gridPattern"
-                                                                  width="20"
-                                                                  height="20"
-                                                                  patternUnits="userSpaceOnUse"
-                                                                >
-                                                                  <path
-                                                                    d="M 20 0 L 0 0 0 20"
-                                                                    fill="none"
-                                                                    stroke="#e0e0e0"
-                                                                    strokeWidth="1"
-                                                                  />
-                                                                </pattern>
-                                                              </defs>
-                                                              <rect
-                                                                        // Fill the entire large area with your pattern
-                                                                        width={workspaceSize.width}
-                                                                        height={workspaceSize.height}
-                                                                        fill="url(#gridPattern)"
-                                                                      />
+                <div
+                  className="absolute"
+                  style={{
+                    transform: `translate(${offset.x}px, ${offset.y}px)`,
+                  }}
+                >
+                  <svg
+                    width={workspaceSize.width}
+                    height={workspaceSize.height}
+                  >
+                    <defs>
+                      <pattern
+                        id="gridPattern"
+                        width="20"
+                        height="20"
+                        patternUnits="userSpaceOnUse"
+                      >
+                        <path
+                          d="M 20 0 L 0 0 0 20"
+                          fill="none"
+                          stroke="#e0e0e0"
+                          strokeWidth="1"
+                        />
+                      </pattern>
+                    </defs>
+                    <rect
+                      width={workspaceSize.width}
+                      height={workspaceSize.height}
+                      fill="url(#gridPattern)"
+                    />
 
-                                                                      {connections.map((conn, idx) => {
-                                                                                const sourceNode = nodes.find(n => n.id === conn.sourceId);
-                                                                                const targetNode = nodes.find(n => n.id === conn.targetId);
-                                                                                if (!sourceNode || !targetNode) return null;
+                    {connections.map((conn, idx) => {
+                      const sourceNode = nodes.find(n => n.id === conn.sourceId);
+                      const targetNode = nodes.find(n => n.id === conn.targetId);
+                      if (!sourceNode || !targetNode) return null;
 
-                                                                                const sourceX = sourceNode.position.x + 320;
-                                                                                const sourceY = sourceNode.position.y + 64;
-                                                                                const targetX = targetNode.position.x;
-                                                                                const targetY = targetNode.position.y + 64;
-                                                                                const dx = targetX - sourceX;
-                                                                                const controlX = Math.abs(dx) * 0.5;
+                      const sourceX = sourceNode.position.x + 320;
+                      const sourceY = sourceNode.position.y + 64;
+                      const targetX = targetNode.position.x;
+                      const targetY = targetNode.position.y + 64;
+                      const dx = targetX - sourceX;
+                      const controlX = Math.abs(dx) * 0.5;
 
-                                                                                return (
-                                                                                  <g key={idx}>
-                                                                                    <path
-                                                                                      d={`M ${sourceX} ${sourceY}
-                                                                                         C ${sourceX + controlX} ${sourceY},
-                                                                                           ${targetX - controlX} ${targetY},
-                                                                                           ${targetX} ${targetY}`}
-                                                                                      stroke="#666"
-                                                                                      strokeWidth="2"
-                                                                                      fill="none"
-                                                                                    />
-                                                                                    <circle cx={sourceX} cy={sourceY} r="4" fill="#4444ff" />
-                                                                                    <circle cx={targetX} cy={targetY} r="4" fill="#666" />
-                                                                                  </g>
-                                                                                );
-                                                                              })}
+                      return (
+                        <g key={idx}>
+                          <path
+                            d={`M ${sourceX} ${sourceY}
+                               C ${sourceX + controlX} ${sourceY},
+                                 ${targetX - controlX} ${targetY},
+                                 ${targetX} ${targetY}`}
+                            stroke="#666"
+                            strokeWidth="2"
+                            fill="none"
+                          />
+                          <circle cx={sourceX} cy={sourceY} r="4" fill="#4444ff" />
+                          <circle cx={targetX} cy={targetY} r="4" fill="#666" />
+                        </g>
+                      );
+                    })}
 
-                                                                              {/* Selection box */}
-                                                                              {selectionBox && (
-                                                                                <rect
-                                                                                  x={selectionBox.x}
-                                                                                  y={selectionBox.y}
-                                                                                  width={selectionBox.width}
-                                                                                  height={selectionBox.height}
-                                                                                  fill="rgba(59, 130, 246, 0.1)"
-                                                                                  stroke="rgb(59, 130, 246)"
-                                                                                  strokeWidth="1"
-                                                                                />
-                                                                              )}
-                                                                            </svg>
+                    {selectionBox && (
+                      <rect
+                        x={selectionBox.x}
+                        y={selectionBox.y}
+                        width={selectionBox.width}
+                        height={selectionBox.height}
+                        fill="rgba(59, 130, 246, 0.1)"
+                        stroke="rgb(59, 130, 246)"
+                        strokeWidth="1"
+                      />
+                    )}
+                  </svg>
 
-                                                                            {/* Node cards */}
-                                                                                  {nodes.map(node => (
-                                                                                    <ComputationalNode
-                                                                                      key={node.id}
-                                                                                      node={node}
-                                              updateNode={updateNode}
-                                              deleteNode={deleteNode}
-                                              duplicateNode={duplicateNode}
-                                              connections={connections}
-                                              createConnection={createConnection}
-                                              position={node.position}
-                                              data-node-id={node.id}
-                                              onPositionChange={(id, pos) => {
-                                                  if (selectedNodes.has(id)) {
-                                                      // Calculate the delta based on the node being dragged
-                                                      const draggedNode = nodes.find(n => n.id === id);
-                                                      if (draggedNode) {
-                                                          const dx = pos.x - draggedNode.position.x;
-                                                          const dy = pos.y - draggedNode.position.y;
-                                                          setNodes(prevNodes => prevNodes.map(n =>
-                                                              selectedNodes.has(n.id)
-                                                                  ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
-                                                                  : n
-                                                          ));
-                                                      }
-                                                  } else {
-                                                      updateNode(id, { ...node, position: pos });
-                                                  }
-                                              }}
-                                              allNodes={nodes}
-                                              updateNodeQ={updateNodeQ}
-                                              isSelected={selectedNodes.has(node.id)}
-                                              onSelect={handleNodeSelect}
-                                              settings={settings}
-                                            />
-                                          ))}
-                                        </div>
-                                      </div>
-                                    );
-                                  }
+                  {nodes.map(node => (
+                    <ComputationalNode
+                      key={node.id}
+                      node={node}
+                      updateNode={updateNode}
+                      deleteNode={deleteNode}
+                      duplicateNode={duplicateNode}
+                      connections={connections}
+                      createConnection={createConnection}
+                      position={node.position}
+                      data-node-id={node.id}
+                      onPositionChange={(id, pos) => {
+                        if (selectedNodes.has(id)) {
+                          const draggedNode = nodes.find(n => n.id === id);
+                          if (draggedNode) {
+                            const dx = pos.x - draggedNode.position.x;
+                            const dy = pos.y - draggedNode.position.y;
+                            setNodes(prevNodes => prevNodes.map(n =>
+                              selectedNodes.has(n.id)
+                                ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+                                : n
+                            ));
+                          }
+                        } else {
+                          updateNode(id, { ...node, position: pos });
+                        }
+                      }}
+                      allNodes={nodes}
+                      updateNodeQ={updateNodeQ}
+                      isSelected={selectedNodes.has(node.id)}
+                      onSelect={handleNodeSelect}
+                      settings={settings}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          }
 
-
-          export default ComputationalFramework;
+export default ComputationalFramework;
