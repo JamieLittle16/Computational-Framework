@@ -58,6 +58,19 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
         />
         <p className="text-sm text-gray-500">Base for modular arithmetic (minimum 2)</p>
       </div>
+      <div className="flex items-center gap-2"> {/* Use flexbox for alignment */}
+        <Checkbox
+          id="colorMode"
+          checked={settings.colorMode}
+          onCheckedChange={(checked) => onSettingsChange({ ...settings, colorMode: checked })}
+        />
+        <label
+          htmlFor="colorMode"
+          className="text-sm text-gray-700 cursor-pointer"
+        >
+          Enable Colour-Coding
+        </label>
+      </div>
     </div>
   );
 };
@@ -263,6 +276,7 @@ const ComputationalNode = ({
   };
 
   const backgroundColor = useMemo(() => {
+    if (!settings.colorMode) return 'white'; // Use white if colorMode is off
       const hue = Math.max(0, Math.min(360, (node.q / settings.modBase) * 360));
       const saturation = 0.2;
       const value = 1;
