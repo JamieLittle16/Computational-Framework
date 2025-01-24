@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, X } from 'lucide-react';
 import { evaluate } from 'mathjs';
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import * as math from 'mathjs';
 
 function hsvToRgb(h, s, v) {
   h /= 360; // Normalize hue to 0-1 range
@@ -211,7 +212,8 @@ const ComputationalNode = ({
                            const sanitizedName = n.name.replace(/ /g, '_');
                          acc[sanitizedName] = () => nodeCall(n.id);
                          return acc;
-                        }, {})
+                        }, {}),
+                        ...math // Add all mathjs functions to the scope
                     };
 
 
