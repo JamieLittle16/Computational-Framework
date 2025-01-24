@@ -405,10 +405,11 @@ const ComputationalNode = ({
               Q Value: {isNaN(node.q) ? '0' : node.q.toFixed(2)}
             </label>
             <div
-            className="w-4 h-4 bg-blue-500 rounded-full cursor-pointer hover:bg-blue-600 transition-all duration-200 hover:scale-110 hover:shadow-md"
+            className="w-6 h-6 bg-blue-500 rounded-full cursor-pointer hover:bg-blue-600 transition-all duration-200 hover:scale-110 hover:shadow-md"
               draggable
               onMouseDown={(e) => e.stopPropagation()}
               onDragStart={handleConnectionStart}
+              style={{ width: '16px', height: '16px' }} // Increased size for the output connection point
             />
           </div>
         </div>
@@ -419,10 +420,11 @@ const ComputationalNode = ({
             {Object.entries(node.inputs).map(([name, input]) => (
               <div key={name} className="flex items-center gap-2">
                 <div
-                className="w-4 h-4 bg-gray-200 rounded-full hover:bg-gray-300 transition-all duration-200 hover:scale-110 cursor-pointer"
+                className="w-6 h-6 bg-gray-200 rounded-full hover:bg-gray-300 transition-all duration-200 hover:scale-110 cursor-pointer"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleInputDrop(e, name)}
                   onMouseDown={(e) => e.stopPropagation()}
+                  style={{ width: '16px', height: '16px' }} // Increased size for the input connection point
                 />
                 <Input
                   type="number"
