@@ -8,6 +8,21 @@ import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, X } fr
 import { evaluate } from 'mathjs';
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 
+function hsvToRgb(h, s, v) {
+  h /= 360; // Normalize hue to 0-1 range
+  let i = Math.floor(h * 6);
+  let f = h * 6 - i;
+  let p = v * (1 - s);
+  let q = v * (1 - f * s);
+  let t = v * (1 - (1 - f) * s);
+  i %= 6;
+  return [
+    [v, q, p, p, t, v][i] * 255,
+    [t, v, v, q, p, p][i] * 255,
+    [p, p, t, v, v, q][i] * 255,
+  ];
+}
+
 // Settings component
 const SettingsPanel = ({ settings, onSettingsChange }) => {
   return (
@@ -247,6 +262,14 @@ const ComputationalNode = ({
     setShowMenu(prev => !prev);
   };
 
+  const backgroundColor = useMemo(() => {
+      const hue = Math.max(0, Math.min(360, (node.q / settings.modBase) * 360));
+      const saturation = 0.2;
+      const value = 1;
+      const rgb = hsvToRgb(hue, saturation, value);
+      return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+    }, [node.q, settings.modBase]); // Only recalculate when qValue or modBase changes
+
   return (
     <Card
       ref={nodeRef}
@@ -255,7 +278,7 @@ const ComputationalNode = ({
         left: position.x,
         top: position.y,
         cursor: isDragging ? 'grabbing' : 'grab',
-        backgroundColor: isNodeSelected ? '#f0f9ff' : 'white',
+        backgroundColor: isNodeSelected ? '#f0f9ff' : backgroundColor,
         WebkitUserSelect: 'none',
         MozUserSelect: 'none',
         msUserSelect: 'none',
