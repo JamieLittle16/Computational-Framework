@@ -27,6 +27,22 @@ function hsvToRgb(h, s, v) {
 
 // Settings component
 const SettingsPanel = ({ settings, onSettingsChange }) => {
+  const [localValues, setLocalValues] = useState({
+       initialQ: { value: settings.initialQ, isDefault: settings.initialQ === 0 },
+       modBase: { value: settings.modBase, isDefault: settings.modBase === 2 },
+        maxEvalDepth: { value: settings.maxEvalDepth, isDefault: settings.maxEvalDepth === 100 },
+        delay: { value: settings.delay, isDefault: settings.delay === 100 },
+        selectionTintStrength: { value: settings.selectionTintStrength, isDefault: settings.selectionTintStrength === 0.15 }
+    });
+
+    const handleInputChange = (e, id, defaultValue) => {
+        const rawValue = e.target.value;
+        const value = rawValue === "" ? defaultValue : parseFloat(rawValue);
+           setLocalValues(prev => ({
+            ...prev,
+            [id]: {value: isNaN(value) ? defaultValue : value, isDefault: rawValue === "" }
+        }))
+     };
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -34,11 +50,18 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
         <Input
           id="initialQ"
           type="number"
-          value={settings.initialQ}
-          onChange={(e) => onSettingsChange({
-            ...settings,
-            initialQ: parseFloat(e.target.value) || 0
-          })}
+            placeholder="0"
+          value={localValues.initialQ.isDefault ? "" : String(localValues.initialQ.value)}
+            onFocus={(e) => {
+               if (localValues.initialQ.isDefault) e.target.value = "";
+           }}
+            onBlur={() => {
+                onSettingsChange({
+                    ...settings,
+                    initialQ: localValues.initialQ.value
+                })
+            }}
+           onChange={(e) => handleInputChange(e, "initialQ", 0)}
         />
         <p className="text-sm text-gray-500">Default Q value for new nodes</p>
       </div>
@@ -49,14 +72,18 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
             id="modBase"
             type="number"
             min="2"
-            value={settings.modBase}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 2;
-                onSettingsChange({
-                  ...settings,
-                   modBase: Math.max(2, value)
-                 });
-               }}
+            placeholder="2"
+           value={localValues.modBase.isDefault ? "" : String(localValues.modBase.value)}
+           onFocus={(e) => {
+               if (localValues.modBase.isDefault) e.target.value = "";
+           }}
+           onBlur={() => {
+                    onSettingsChange({
+                        ...settings,
+                       modBase: localValues.modBase.value
+                     });
+              }}
+              onChange={(e) => handleInputChange(e, "modBase", 2)}
            />
         <p className="text-sm text-gray-500">Base for modular arithmetic (minimum 2)</p>
       </div>
@@ -66,14 +93,18 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
             id="maxEvalDepth"
             type="number"
             min="1"
-            value={settings.maxEvalDepth}
-            onChange={(e) => {
-                const value = parseInt(e.target.value) || 100;
-                onSettingsChange({
-                  ...settings,
-                    maxEvalDepth: Math.max(1, value)
-               });
-            }}
+             placeholder="100"
+            value={localValues.maxEvalDepth.isDefault ? "" : String(localValues.maxEvalDepth.value)}
+            onFocus={(e) => {
+                if (localValues.maxEvalDepth.isDefault) e.target.value = "";
+             }}
+             onBlur={() => {
+               onSettingsChange({
+                ...settings,
+                maxEvalDepth: localValues.maxEvalDepth.value
+                });
+              }}
+           onChange={(e) => handleInputChange(e, "maxEvalDepth", 100)}
           />
           <p className="text-sm text-gray-500">Maximum depth of evaluation to prevent infinite loops</p>
         </div>
@@ -83,14 +114,18 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
             id="delay"
             type="number"
             min="0"
-            value={settings.delay}
-            onChange={(e) => {
-                const value = parseInt(e.target.value) || 100;
-                onSettingsChange({
-                    ...settings,
-                    delay: Math.max(0, value),
-                });
+            placeholder="100"
+             value={localValues.delay.isDefault ? "" : String(localValues.delay.value)}
+            onFocus={(e) => {
+                if (localValues.delay.isDefault) e.target.value = "";
             }}
+             onBlur={() => {
+                  onSettingsChange({
+                        ...settings,
+                        delay: localValues.delay.value,
+                    });
+               }}
+              onChange={(e) => handleInputChange(e, "delay", 100)}
           />
           <p className="text-sm text-gray-500">Delay before node updates in milliseconds.</p>
         </div>
@@ -102,14 +137,18 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
             min="0"
             max="1"
             step="0.05"
-            value={settings.selectionTintStrength}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value)
-              onSettingsChange({
-                ...settings,
-                selectionTintStrength: Math.max(0, Math.min(1, isNaN(value) ? 0 : value)),
-              });
-            }}
+             placeholder="0.15"
+             value={localValues.selectionTintStrength.isDefault ? "" : String(localValues.selectionTintStrength.value)}
+             onFocus={(e) => {
+                 if (localValues.selectionTintStrength.isDefault) e.target.value = "";
+                }}
+             onBlur={() => {
+               onSettingsChange({
+                 ...settings,
+                   selectionTintStrength: localValues.selectionTintStrength.value,
+                 });
+             }}
+             onChange={(e) => handleInputChange(e, "selectionTintStrength", 0.15)}
           />
           <p className="text-sm text-gray-500">Strength of the blue tint when node is selected (0 to 1)</p>
         </div>
@@ -130,7 +169,6 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
     </div>
   );
 };
-
 
 const ComputationalNode = ({
     node,
@@ -584,7 +622,7 @@ const ComputationalFramework = () => {
         maxEvalDepth: 100,
         colorMode: false,
         delay: 100,
-        selectionTintStrength: 0.5
+        selectionTintStrength: 0.15
     });
 
   const createNode = useCallback(() => {
