@@ -60,9 +60,13 @@ const ComputationalNode = ({
 
     const handleInputDrop = (e, inputName) => {
         e.preventDefault();
-        const sourceNodeId = parseInt(e.dataTransfer.getData('sourceNodeId'));
-        if (sourceNodeId !== node.id) { // Prevent self-connection
-            createConnection(sourceNodeId, node.id, inputName);
+        try {
+            const sourceNodeId = parseInt(e.dataTransfer.getData('sourceNodeId'));
+            if (sourceNodeId !== node.id) { // Prevent self-connection
+                createConnection(sourceNodeId, node.id, inputName);
+            }
+        } catch (error) {
+            console.error("Error during input drop:", error);
         }
     };
 
@@ -90,34 +94,42 @@ const ComputationalNode = ({
 
     // Get connected input value
     const getConnectedInputValue = useCallback((inputName) => {
-        const connection = connections.find(c => c.targetId === node.id && c.inputName === inputName);
-        if (connection) {
-            const sourceNode = allNodes.find(n => n.id === connection.sourceId);
-            return sourceNode ? sourceNode.q : 0;
+        try {
+            const connection = connections.find(c => c.targetId === node.id && c.inputName === inputName);
+            if (connection) {
+                const sourceNode = allNodes.find(n => n.id === connection.sourceId);
+                return sourceNode ? sourceNode.q : 0;
+            }
+            return 0;
+        } catch (error) {
+            console.error("Error getting connected input value:", error);
+            return 0;
         }
-        return 0;
     }, [connections, node.id, allNodes]);
 
     // Formula evaluation effect
     const effectDependencies = useMemo(() => {
-        const inputNodeIds = connections
-            .filter(c => c.targetId === node.id)
-            .map(c => allNodes.find(n => n.id === c.sourceId)?.id || 'undefined')
-            .sort()
-            .join(',');
+        try {
+            const inputNodeIds = connections
+                .filter(c => c.targetId === node.id)
+                .map(c => allNodes.find(n => n.id === c.sourceId)?.id || 'undefined')
+                .sort()
+                .join(',');
 
-
-        return [
-            node.formula,
-            JSON.stringify(node.inputs),
-            node.useMod2,
-            inputNodeIds,
-            allNodes.find(n => n.id === node.id)?.q,
-            settings.modBase,
-            settings.maxEvalDepth,
-            settings.delay,
-
-        ].join(':')
+            return [
+                node.formula,
+                JSON.stringify(node.inputs),
+                node.useMod2,
+                inputNodeIds,
+                allNodes.find(n => n.id === node.id)?.q,
+                settings.modBase,
+                settings.maxEvalDepth,
+                settings.delay,
+            ].join(':');
+        } catch (error) {
+            console.error("Error creating effect dependencies:", error);
+            return '';
+        }
     }, [node, connections, allNodes, settings]);
 
 
@@ -160,24 +172,21 @@ const ComputationalNode = ({
                             }
                             return acc;
                         }, {}),
-                        ...allNodes.reduce((acc, n) => {
-                            const sanitizedName = n.name.replace(/ /g, '_');
-                            acc[sanitizedName] = () => nodeCall(n.id);
-                            return acc;
-                        }, {}),
+                         ...allNodes.reduce((acc, n) => {
+                             const sanitizedName = n.name.replace(/ /g, '_');
+                             acc[sanitizedName] = () => nodeCall(n.id);
+                             return acc;
+                         }, {}),
                         ...math // Add all mathjs functions to the scope
                     };
-
 
 
                     try {
                         const matches = currentNode.formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
                         const undefinedVars = matches.filter(v => scope[v] === undefined);
                         if (undefinedVars.length > 0) {
-                            throw new Error(`Undefined variables: ${undefinedVars.join(', ')}`);
+                           throw new Error(`Undefined variables: ${undefinedVars.join(', ')}`);
                         }
-
-
                         let result = math.evaluate(currentNode.formula, scope);
                         if (currentNode.useMod2) {
                             result = ((result % settings.modBase) + settings.modBase) % settings.modBase;
@@ -243,11 +252,16 @@ const ComputationalNode = ({
 
     const backgroundColor = useMemo(() => {
         if (!settings.colorMode) return 'white';
+        try {
         const hue = Math.max(0, Math.min(360, (node.q / settings.modBase) * 360));
         const saturation = 0.2;
         const value = 1;
         const rgb = hsvToRgb(hue, saturation, value);
         return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+        } catch (error){
+           console.error("Error setting background color:", error);
+           return 'white';
+        }
     }, [node.q, settings.modBase, settings.colorMode]);
 
     return (
@@ -264,7 +278,7 @@ const ComputationalNode = ({
                 msUserSelect: 'none',
                 userSelect: 'none',
                 transition: 'background-color 0.2s ease-in-out, transform 0.1s ease-in-out, border 0.2s ease-in-out',
-                transform:  'scale(1)'
+                transform: 'scale(1)'
             }}
             onMouseDown={handleNodeDragStart}
         >

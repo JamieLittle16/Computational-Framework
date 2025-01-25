@@ -33,294 +33,356 @@ const ComputationalFramework = () => {
     });
 
     const createNode = useCallback(() => {
-        const container = containerRef.current;
-        const rect = container.getBoundingClientRect();
+        try {
+            const container = containerRef.current;
+            if (!container) throw new Error("Container ref is not valid.");
 
-        const centerX = (rect.width / 2) - 160 - offset.x;
-        const centerY = (rect.height / 2) - 100 - offset.y;
+            const rect = container.getBoundingClientRect();
 
-        const newNode = {
-            id: nextNodeId,
-            position: { x: centerX, y: centerY },
-            inputs: {},
-            formula: '',
-            useMod2: true,
-            q: settings.initialQ,
-            name: `Node ${nextNodeId}`
-        };
-        setNodes(prevNodes => [...prevNodes, newNode]);
-        setNextNodeId(prevId => prevId + 1);
+            const centerX = (rect.width / 2) - 160 - offset.x;
+            const centerY = (rect.height / 2) - 100 - offset.y;
+
+            const newNode = {
+                id: nextNodeId,
+                position: { x: centerX, y: centerY },
+                inputs: {},
+                formula: '',
+                useMod2: true,
+                q: settings.initialQ,
+                name: `Node ${nextNodeId}`
+            };
+            setNodes(prevNodes => [...prevNodes, newNode]);
+            setNextNodeId(prevId => prevId + 1);
+        } catch (error) {
+            console.error("Error creating node:", error);
+        }
     }, [nextNodeId, offset, settings.initialQ]);
 
     const saveSetup = () => {
-        const setup = {
-            nodes: nodes.map(node => ({
-                ...node,
-                position: {
-                    x: node.position.x - offset.x,
-                    y: node.position.y - offset.y
-                }
-            })),
-            connections,
-            nextNodeId,
-            settings
-        };
-        const blob = new Blob([JSON.stringify(setup, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'computational-setup.json';
-        a.click();
-        URL.revokeObjectURL(url);
+        try {
+            const setup = {
+                nodes: nodes.map(node => ({
+                    ...node,
+                    position: {
+                        x: node.position.x - offset.x,
+                        y: node.position.y - offset.y
+                    }
+                })),
+                connections,
+                nextNodeId,
+                settings
+            };
+            const blob = new Blob([JSON.stringify(setup, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'computational-setup.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error saving setup:", error);
+        }
     };
 
     const loadSetup = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const setup = JSON.parse(e.target.result);
-                    setNodes(setup.nodes);
-                    setConnections(setup.connections);
-                    setNextNodeId(setup.nextNodeId);
-                    setOffset({ x: 0, y: 0 });
-                    if (setup.settings) {
-                        setSettings(setup.settings);
+        try {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const setup = JSON.parse(e.target.result);
+                        setNodes(setup.nodes);
+                        setConnections(setup.connections);
+                        setNextNodeId(setup.nextNodeId);
+                        setOffset({ x: 0, y: 0 });
+                        if (setup.settings) {
+                            setSettings(setup.settings);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing setup:', error);
                     }
-                } catch (error) {
-                    console.error('Error loading setup:', error);
-                }
-            };
-            reader.readAsText(file);
+                };
+                reader.readAsText(file);
+            }
+        } catch (error) {
+            console.error("Error loading setup:", error);
         }
     };
 
     const updateNode = useCallback((id, updatedNode) => {
-        setNodes(prevNodes =>
-            prevNodes.map(node => node.id === id ? updatedNode : node)
-        );
+         try{
+            setNodes(prevNodes =>
+                prevNodes.map(node => node.id === id ? updatedNode : node)
+            );
+        } catch (error){
+            console.error("Error updating node:", error);
+        }
     }, []);
 
     const deleteNode = useCallback((id) => {
-        setNodes(prevNodes => prevNodes.filter(node => node.id !== id));
-        setConnections(prevConns =>
-            prevConns.filter(conn => conn.sourceId !== id && conn.targetId !== id)
-        );
+        try {
+            setNodes(prevNodes => prevNodes.filter(node => node.id !== id));
+            setConnections(prevConns =>
+                prevConns.filter(conn => conn.sourceId !== id && conn.targetId !== id)
+            );
+        } catch (error) {
+             console.error("Error deleting node:", error);
+        }
     }, []);
 
     const duplicateNode = useCallback((node) => {
-        const newNode = {
-            ...node,
-            id: nextNodeId,
-            position: { x: node.position.x + 50, y: node.position.y + 50 }
-        };
-        setNodes(prevNodes => [...prevNodes, newNode]);
-        setNextNodeId(prevId => prevId + 1);
+         try{
+             const newNode = {
+                 ...node,
+                 id: nextNodeId,
+                 position: { x: node.position.x + 50, y: node.position.y + 50 }
+             };
+             setNodes(prevNodes => [...prevNodes, newNode]);
+             setNextNodeId(prevId => prevId + 1);
+        } catch(error){
+             console.error("Error duplicating node:", error);
+        }
     }, [nextNodeId]);
 
     const createConnection = useCallback((sourceId, targetId, inputName) => {
-        setConnections(prevConns => {
-            const newConns = prevConns.filter(conn =>
-                !(conn.targetId === targetId && conn.inputName === inputName)
-            );
-            return [...newConns, { sourceId, targetId, inputName }];
-        });
+        try {
+            setConnections(prevConns => {
+                const newConns = prevConns.filter(conn =>
+                    !(conn.targetId === targetId && conn.inputName === inputName)
+                );
+                return [...newConns, { sourceId, targetId, inputName }];
+            });
 
-        setNodes(prevNodes => prevNodes.map(node => {
-            if (node.id === targetId) {
-                return {
-                    ...node,
-                    inputs: {
-                        ...node.inputs,
-                        [inputName]: { ...node.inputs[inputName], isConnected: true }
-                    }
-                };
-            }
-            return node;
-        }));
+            setNodes(prevNodes => prevNodes.map(node => {
+                if (node.id === targetId) {
+                    return {
+                        ...node,
+                        inputs: {
+                            ...node.inputs,
+                            [inputName]: { ...node.inputs[inputName], isConnected: true }
+                        }
+                    };
+                }
+                return node;
+            }));
+        } catch (error) {
+            console.error("Error creating connection:", error)
+        }
     }, []);
 
     const updateNodeQ = useCallback((id, newQ) => {
-        setNodes(prevNodes =>
-            prevNodes.map(node =>
-                node.id === id ? { ...node, q: newQ } : node
-            )
-        );
+        try {
+            setNodes(prevNodes =>
+                prevNodes.map(node =>
+                    node.id === id ? { ...node, q: newQ } : node
+                )
+            );
+        } catch (error) {
+             console.error("Error updating node Q value:", error);
+        }
     }, []);
 
     const handleNodeSelect = (nodeId, isShiftKey) => {
-        setSelectedNodes(prev => {
-            const newSelection = new Set(prev);
-            if (isShiftKey) {
-                if (newSelection.has(nodeId)) {
-                    newSelection.delete(nodeId);
-                } else {
-                    newSelection.add(nodeId);
-                }
-            } else {
-                if (newSelection.size === 1 && newSelection.has(nodeId)) {
-                    newSelection.clear();
-                } else {
-                    newSelection.clear();
-                    newSelection.add(nodeId);
-                }
-            }
-            return newSelection;
-        });
+        try {
+             setSelectedNodes(prev => {
+                 const newSelection = new Set(prev);
+                 if (isShiftKey) {
+                     if (newSelection.has(nodeId)) {
+                         newSelection.delete(nodeId);
+                     } else {
+                         newSelection.add(nodeId);
+                     }
+                 } else {
+                     if (newSelection.size === 1 && newSelection.has(nodeId)) {
+                         newSelection.clear();
+                     } else {
+                         newSelection.clear();
+                         newSelection.add(nodeId);
+                     }
+                 }
+                 return newSelection;
+             });
+        } catch(error){
+            console.error("Error selecting node:", error);
+        }
     };
 
     const handleConnectionSelect = (sourceId, targetId, inputName, isShiftKey) => {
-        setSelectedConnections(prev => {
-            const newSelection = new Set(prev);
-            const connectionString = `${sourceId}-${targetId}-${inputName}`;
-            if (isShiftKey) {
-                if (newSelection.has(connectionString)) {
-                    newSelection.delete(connectionString);
+        try {
+            setSelectedConnections(prev => {
+                const newSelection = new Set(prev);
+                const connectionString = `${sourceId}-${targetId}-${inputName}`;
+                if (isShiftKey) {
+                    if (newSelection.has(connectionString)) {
+                        newSelection.delete(connectionString);
+                    } else {
+                        newSelection.add(connectionString);
+                    }
                 } else {
-                    newSelection.add(connectionString);
+                    if (newSelection.size === 1 && newSelection.has(connectionString)) {
+                        newSelection.clear();
+                    } else {
+                        newSelection.clear();
+                        newSelection.add(connectionString);
+                    }
                 }
-            } else {
-                if (newSelection.size === 1 && newSelection.has(connectionString)) {
-                    newSelection.clear();
-                } else {
-                    newSelection.clear();
-                    newSelection.add(connectionString);
-                }
-            }
-            return newSelection;
-        });
+                return newSelection;
+            });
+        } catch (error){
+            console.error("Error selecting connection:", error);
+        }
     };
 
     const handleMouseDown = (e) => {
-        if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
-            setIsPanning(true);
-            lastMousePos.current = { x: e.clientX, y: e.clientY };
-            return;
-        }
+        try {
+             if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
+                 setIsPanning(true);
+                 lastMousePos.current = { x: e.clientX, y: e.clientY };
+                 return;
+             }
 
-        if (e.button === 0) {
-            setIsSelecting(true);
-            const rect = containerRef.current.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+             if (e.button === 0) {
+                 setIsSelecting(true);
+                 const rect = containerRef.current.getBoundingClientRect();
+                 const x = e.clientX - rect.left;
+                 const y = e.clientY - rect.top;
 
-            setSelectionStart({
-                x: x - offset.x,
-                y: y - offset.y
-            });
+                 setSelectionStart({
+                     x: x - offset.x,
+                     y: y - offset.y
+                 });
 
-            setSelectionBox({
-                x: x - offset.x,
-                y: y - offset.y,
-                width: 0,
-                height: 0
-            });
-            if (!e.shiftKey) {
-                setSelectedNodes(new Set());
-                setSelectedConnections(new Set());
-            }
+                 setSelectionBox({
+                     x: x - offset.x,
+                     y: y - offset.y,
+                     width: 0,
+                     height: 0
+                 });
+                 if (!e.shiftKey) {
+                     setSelectedNodes(new Set());
+                     setSelectedConnections(new Set());
+                 }
+             }
+        } catch(error){
+            console.error("Error handling mouse down:", error)
         }
     };
 
     const handleNodeDragStart = useCallback((nodeId, e) => {
-        if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
-        e.stopPropagation();
-        e.preventDefault();
-        if (!selectedNodes.has(nodeId)) {
-            handleNodeSelect(nodeId, e.shiftKey);
-        }
+        try {
+            if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+            e.stopPropagation();
+            e.preventDefault();
+            if (!selectedNodes.has(nodeId)) {
+                handleNodeSelect(nodeId, e.shiftKey);
+            }
 
-        setIsDraggingNodes(true);
-        setDraggedNode(nodes.find(n => n.id === nodeId));
-        lastMousePos.current = { x: e.clientX, y: e.clientY };
+            setIsDraggingNodes(true);
+            setDraggedNode(nodes.find(n => n.id === nodeId));
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+        } catch (error){
+            console.error("Error handling node drag start:", error);
+        }
     }, [selectedNodes, nodes, handleNodeSelect]);
 
     const handleMouseMove = (e) => {
-        if (isPanning) {
-            const dx = e.clientX - lastMousePos.current.x;
-            const dy = e.clientY - lastMousePos.current.y;
-
-            setOffset(prev => ({
-                x: prev.x + dx,
-                y: prev.y + dy,
-            }));
-            lastMousePos.current = { x: e.clientX, y: e.clientY };
-            return;
-        } else if (isDraggingNodes) {
-            if (draggedNode) {
+        try {
+           if (isPanning) {
                 const dx = e.clientX - lastMousePos.current.x;
                 const dy = e.clientY - lastMousePos.current.y;
 
-                setNodes(prevNodes => prevNodes.map(n => {
-                    if (selectedNodes.has(n.id)) {
-                        const newX = n.position.x + dx;
-                        const newY = n.position.y + dy;
-                        return { ...n, position: { x: newX, y: newY } };
-                    }
-                    return n;
+                setOffset(prev => ({
+                    x: prev.x + dx,
+                    y: prev.y + dy,
                 }));
                 lastMousePos.current = { x: e.clientX, y: e.clientY };
-            }
-            return;
-        }
+                return;
+            } else if (isDraggingNodes) {
+                if (draggedNode) {
+                    const dx = e.clientX - lastMousePos.current.x;
+                    const dy = e.clientY - lastMousePos.current.y;
 
-        if (isSelecting && selectionStart) {
-            const rect = containerRef.current.getBoundingClientRect();
-            const currentX = e.clientX - rect.left - offset.x;
-            const currentY = e.clientY - rect.top - offset.y;
-
-            const newSelectionBox = {
-                x: Math.min(selectionStart.x, currentX),
-                y: Math.min(selectionStart.y, currentY),
-                width: Math.abs(currentX - selectionStart.x),
-                height: Math.abs(currentY - selectionStart.y)
-            };
-
-            setSelectionBox(newSelectionBox);
-
-            const newSelectedNodes = new Set();
-            nodes.forEach(node => {
-                const nodeRect = {
-                    left: node.position.x,
-                    right: node.position.x + 320,
-                    top: node.position.y,
-                    bottom: node.position.y + 200
-                };
-
-                if (
-                    nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
-                    nodeRect.right > newSelectionBox.x &&
-                    nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
-                    nodeRect.bottom > newSelectionBox.y
-                ) {
-                    newSelectedNodes.add(node.id);
+                    setNodes(prevNodes => prevNodes.map(n => {
+                        if (selectedNodes.has(n.id)) {
+                            const newX = n.position.x + dx;
+                            const newY = n.position.y + dy;
+                            return { ...n, position: { x: newX, y: newY } };
+                        }
+                        return n;
+                    }));
+                    lastMousePos.current = { x: e.clientX, y: e.clientY };
                 }
-            });
+                return;
+            }
 
-            setSelectedNodes(newSelectedNodes);
-            setSelectedConnections(new Set());
+             if (isSelecting && selectionStart) {
+                 const rect = containerRef.current.getBoundingClientRect();
+                 const currentX = e.clientX - rect.left - offset.x;
+                 const currentY = e.clientY - rect.top - offset.y;
+
+                 const newSelectionBox = {
+                     x: Math.min(selectionStart.x, currentX),
+                     y: Math.min(selectionStart.y, currentY),
+                     width: Math.abs(currentX - selectionStart.x),
+                     height: Math.abs(currentY - selectionStart.y)
+                 };
+
+                 setSelectionBox(newSelectionBox);
+
+                 const newSelectedNodes = new Set();
+                 nodes.forEach(node => {
+                     const nodeRect = {
+                         left: node.position.x,
+                         right: node.position.x + 320,
+                         top: node.position.y,
+                         bottom: node.position.y + 200
+                     };
+
+                     if (
+                         nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
+                         nodeRect.right > newSelectionBox.x &&
+                         nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
+                         nodeRect.bottom > newSelectionBox.y
+                     ) {
+                         newSelectedNodes.add(node.id);
+                     }
+                 });
+
+                 setSelectedNodes(newSelectedNodes);
+                 setSelectedConnections(new Set());
+             }
+        } catch (error){
+             console.error("Error handling mouse move:", error);
         }
     };
 
     const handleMouseUp = () => {
-        if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
-            setSelectedNodes(new Set());
-            setSelectedConnections(new Set());
-        }
+        try {
+             if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
+                 setSelectedNodes(new Set());
+                 setSelectedConnections(new Set());
+             }
 
-        setIsPanning(false);
-        setIsDraggingNodes(false);
-        setDraggedNode(null);
-        setIsSelecting(false);
-        setSelectionBox(null);
-        setSelectionStart(null);
+             setIsPanning(false);
+             setIsDraggingNodes(false);
+             setDraggedNode(null);
+             setIsSelecting(false);
+             setSelectionBox(null);
+             setSelectionStart(null);
+        } catch (error){
+            console.error("Error handling mouse up:", error);
+        }
     };
 
 
     const handlePositionChange = useCallback((id, pos) => {
-        if (!selectedNodes.has(id)) {
-            updateNode(id, { ...nodes.find(n => n.id === id), position: pos });
+       try {
+            if (!selectedNodes.has(id)) {
+                updateNode(id, { ...nodes.find(n => n.id === id), position: pos });
+            }
+        } catch(error){
+            console.error("Error handling position change:", error);
         }
     }, [nodes, selectedNodes, updateNode]);
 
