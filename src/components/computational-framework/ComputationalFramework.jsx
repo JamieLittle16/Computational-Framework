@@ -23,6 +23,8 @@ function hsvToRgb(h, s, v) {
 
 
 const ComputationalFramework = () => {
+    const WORKSPACE_BUFFER_X = 2000;
+    const WORKSPACE_BUFFER_Y = 1500;
     const [nodes, setNodes] = useState([]);
     const [connections, setConnections] = useState([]);
     const [selectedConnections, setSelectedConnections] = useState(new Set());
@@ -31,10 +33,14 @@ const ComputationalFramework = () => {
     const [isPanning, setIsPanning] = useState(false);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const containerRef = useRef(null);
+    const boundaryRef = useRef(null);
     const lastMousePos = useRef({ x: 0, y: 0 });
     const [selectionBox, setSelectionBox] = useState(null);
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectionStart, setSelectionStart] = useState(null);
+    const [isDraggingNodes, setIsDraggingNodes] = useState(false);
+    const [draggedNode, setDraggedNode] = useState(null);
+
 
     const [settings, setSettings] = useState({
         initialQ: 0,
@@ -217,12 +223,14 @@ const ComputationalFramework = () => {
         const viewportWidth = rect.width;
         const viewportHeight = rect.height;
 
+
         if (nodes.length === 0) {
             return {
                 width: `${viewportWidth}px`,
                 height: `${viewportHeight}px`,
             };
         }
+
 
         const positions = nodes.map(node => ({
             x: node.position.x,
@@ -234,10 +242,12 @@ const ComputationalFramework = () => {
         const minY = Math.min(...positions.map(p => p.y));
         const maxY = Math.max(...positions.map(p => p.y));
 
-        const width = Math.max(viewportWidth, maxX - minX + 800);
-        const height = Math.max(viewportHeight, maxY - minY + 600);
+
+        const width = Math.max(viewportWidth, maxX - minX + WORKSPACE_BUFFER_X);
+        const height = Math.max(viewportHeight, maxY - minY + WORKSPACE_BUFFER_Y);
+
         return { width: `${width}px`, height: `${height}px` };
-    }, [nodes]);
+    }, [nodes, WORKSPACE_BUFFER_X, WORKSPACE_BUFFER_Y]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -352,12 +362,52 @@ const ComputationalFramework = () => {
         }
     };
 
+    const handleNodeDragStart = useCallback((nodeId, e) => {
+        if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+        e.stopPropagation();
+        e.preventDefault();
+        // Only select if the node wasn't already selected. This will also prevent double move on click.
+        if (!selectedNodes.has(nodeId)) {
+            handleNodeSelect(nodeId, e.shiftKey);
+        }
+
+
+        setIsDraggingNodes(true);
+        setDraggedNode(nodes.find(n => n.id === nodeId));
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+
+
+    }, [selectedNodes, nodes, handleNodeSelect]);
+
+
+
     const handleMouseMove = (e) => {
         if (isPanning) {
             const dx = e.clientX - lastMousePos.current.x;
             const dy = e.clientY - lastMousePos.current.y;
-            setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+
+            setOffset(prev => ({
+                x: prev.x + dx,
+                y: prev.y + dy,
+            }));
             lastMousePos.current = { x: e.clientX, y: e.clientY };
+            return;
+        } else if (isDraggingNodes) {
+            if (draggedNode) {
+                const dx = e.clientX - lastMousePos.current.x;
+                const dy = e.clientY - lastMousePos.current.y;
+
+                setNodes(prevNodes => prevNodes.map(n => {
+                        if (selectedNodes.has(n.id)) {
+                            const newX = n.position.x + dx;
+                            const newY = n.position.y + dy;
+                            return { ...n, position: { x: newX, y: newY } };
+                        }
+                        return n;
+                    }
+                ));
+                lastMousePos.current = { x: e.clientX, y: e.clientY };
+            }
             return;
         }
 
@@ -400,6 +450,7 @@ const ComputationalFramework = () => {
         }
     };
 
+
     const handleMouseUp = () => {
         if (isSelecting && selectionBox && selectionBox.width === 0 && selectionBox.height === 0) {
             setSelectedNodes(new Set());
@@ -407,6 +458,8 @@ const ComputationalFramework = () => {
         }
 
         setIsPanning(false);
+        setIsDraggingNodes(false);
+        setDraggedNode(null)
         setIsSelecting(false);
         setSelectionBox(null);
         setSelectionStart(null);
@@ -490,6 +543,12 @@ const ComputationalFramework = () => {
         ), [workspaceSize, connections, nodes, selectedConnections, selectionBox, handleConnectionSelect]);
 
 
+    const handlePositionChange = useCallback((id, pos) => {
+       if (!selectedNodes.has(id)) {
+         updateNode(id, { ...nodes.find(n=> n.id === id), position: pos });
+        }
+   }, [nodes, selectedNodes, updateNode]);
+
     return (
         <div
             ref={containerRef}
@@ -537,46 +596,33 @@ const ComputationalFramework = () => {
                 />
             </div>
             <div
-                 className="absolute"
-                 style={{
-                   transform: `translate(${offset.x}px, ${offset.y}px)`,
-                 }}
+                className="absolute"
+                style={{
+                    transform: `translate(${offset.x}px, ${offset.y}px)`,
+                }}
+                ref={boundaryRef}
             >
-            {svgContent}
-            {nodes.map(node => (
-                 <ComputationalNode
-                 key={node.id}
-                 node={node}
-                 updateNode={updateNode}
-                 deleteNode={deleteNode}
-                 duplicateNode={duplicateNode}
-                 connections={connections}
-                 createConnection={createConnection}
-                 position={node.position}
-                 data-node-id={node.id}
-                 onPositionChange={(id, pos) => {
-                     if (selectedNodes.has(id)) {
-                         const draggedNode = nodes.find(n => n.id === id);
-                         if (draggedNode) {
-                             const dx = pos.x - draggedNode.position.x;
-                             const dy = pos.y - draggedNode.position.y;
-                             setNodes(prevNodes => prevNodes.map(n =>
-                                 selectedNodes.has(n.id)
-                                     ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
-                                     : n
-                             ));
-                         }
-                     } else {
-                         updateNode(id, { ...node, position: pos });
-                     }
-                 }}
-                 allNodes={nodes}
-                 updateNodeQ={updateNodeQ}
-                 isSelected={selectedNodes.has(node.id)}
-                 onSelect={handleNodeSelect}
-                 settings={settings}
-                 />
-                 ))}
+                {svgContent}
+                {nodes.map(node => (
+                    <ComputationalNode
+                        key={node.id}
+                        node={node}
+                        updateNode={updateNode}
+                        deleteNode={deleteNode}
+                        duplicateNode={duplicateNode}
+                        connections={connections}
+                        createConnection={createConnection}
+                        position={node.position}
+                        data-node-id={node.id}
+                        onPositionChange={handlePositionChange}
+                        allNodes={nodes}
+                        updateNodeQ={updateNodeQ}
+                        isSelected={selectedNodes.has(node.id)}
+                        onSelect={handleNodeSelect}
+                        settings={settings}
+                        onDragStart={handleNodeDragStart}
+                    />
+                ))}
             </div>
         </div>
     );

@@ -36,10 +36,11 @@ const ComputationalNode = ({
     updateNodeQ,
     isSelected,
     onSelect,
-    settings
+    settings,
+    onDragStart
 }) => {
+
     const isNodeSelected = useMemo(() => isSelected, [isSelected]);
-    const [isDragging, setIsDragging] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
     const [nodeName, setNodeName] = useState(`Node ${node.id}`);
     const [formulaError, setFormulaError] = useState('');
@@ -106,19 +107,21 @@ const ComputationalNode = ({
             .join(',');
 
 
-        return  [
+        return [
             node.formula,
             JSON.stringify(node.inputs),
             node.useMod2,
             inputNodeIds,
-             allNodes.find(n => n.id === node.id)?.q,
+            allNodes.find(n => n.id === node.id)?.q,
             settings.modBase,
             settings.maxEvalDepth,
             settings.delay,
 
         ].join(':')
     }, [node, connections, allNodes, settings]);
-     useMemo(() => {
+
+
+    useMemo(() => {
         const evaluateFormula = () => {
             try {
                 if (!node.formula) {
@@ -127,7 +130,7 @@ const ComputationalNode = ({
                 }
 
                 evaluationDepth.current = 0;
-                 const evaluateWithDepthCheck = (nodeId, visited = new Set()) => {
+                const evaluateWithDepthCheck = (nodeId, visited = new Set()) => {
                     if (evaluationDepth.current > settings.maxEvalDepth) {
                         throw new Error('Maximum evaluation depth exceeded');
                     }
@@ -137,33 +140,33 @@ const ComputationalNode = ({
                     if (!currentNode || visited.has(nodeId)) return 0;
                     visited.add(nodeId);
 
-                   const nodeCall = (calledNodeId) => {
-                      if (evaluationDepth.current > settings.maxEvalDepth) {
+                    const nodeCall = (calledNodeId) => {
+                        if (evaluationDepth.current > settings.maxEvalDepth) {
                             throw new Error('Maximum evaluation depth exceeded');
-                      }
+                        }
                         return evaluateWithDepthCheck(calledNodeId, new Set(visited));
                     }
-                     const scope = {
-                       q: currentNode.q,
-                       Q: currentNode.q,
-                       ...Object.entries(currentNode.inputs).reduce((acc, [key, input]) => {
-                         if (input.isConnected) {
-                           const connection = connections.find(c => c.targetId === currentNode.id && c.inputName === key);
-                           if (connection) {
-                             acc[key] = evaluateWithDepthCheck(connection.sourceId, new Set(visited));
-                           }
-                         } else {
-                           acc[key] = input.value;
-                         }
-                         return acc;
-                       }, {}),
-                       ...allNodes.reduce((acc, n) => {
-                           const sanitizedName = n.name.replace(/ /g, '_');
-                         acc[sanitizedName] = () => nodeCall(n.id);
-                         return acc;
+                    const scope = {
+                        q: currentNode.q,
+                        Q: currentNode.q,
+                        ...Object.entries(currentNode.inputs).reduce((acc, [key, input]) => {
+                            if (input.isConnected) {
+                                const connection = connections.find(c => c.targetId === currentNode.id && c.inputName === key);
+                                if (connection) {
+                                    acc[key] = evaluateWithDepthCheck(connection.sourceId, new Set(visited));
+                                }
+                            } else {
+                                acc[key] = input.value;
+                            }
+                            return acc;
                         }, {}),
-                         ...math // Add all mathjs functions to the scope
-                     };
+                        ...allNodes.reduce((acc, n) => {
+                            const sanitizedName = n.name.replace(/ /g, '_');
+                            acc[sanitizedName] = () => nodeCall(n.id);
+                            return acc;
+                        }, {}),
+                        ...math // Add all mathjs functions to the scope
+                    };
 
 
 
@@ -187,20 +190,20 @@ const ComputationalNode = ({
 
                 const result = evaluateWithDepthCheck(node.id);
                 setFormulaError('');
-               if(node.q !== result){
-                updateNodeQ(node.id, result);
+                if (node.q !== result) {
+                    updateNodeQ(node.id, result);
 
-                  // Find downstream nodes and trigger update
-                  const downstreamNodes = connections
-                      .filter(c => c.sourceId === node.id)
-                      .map(c => allNodes.find(n => n.id === c.targetId))
-                      .filter(downstreamNode => !!downstreamNode);
+                    // Find downstream nodes and trigger update
+                    const downstreamNodes = connections
+                        .filter(c => c.sourceId === node.id)
+                        .map(c => allNodes.find(n => n.id === c.targetId))
+                        .filter(downstreamNode => !!downstreamNode);
 
-                     downstreamNodes.forEach(downstreamNode => {
-                            updateNodeQ(downstreamNode.id, downstreamNode.q)
+                    downstreamNodes.forEach(downstreamNode => {
+                        updateNodeQ(downstreamNode.id, downstreamNode.q)
                     })
                 }
-             } catch (error) {
+            } catch (error) {
                 setFormulaError(error.message);
                 updateNodeQ(node.id, 0);
             }
@@ -212,42 +215,9 @@ const ComputationalNode = ({
 
 
     const handleNodeDragStart = (e) => {
-        if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
-
-        e.stopPropagation();
-        e.preventDefault();
-
-        const initialMouseX = e.clientX;
-        const initialMouseY = e.clientY;
-        const initialNodeX = position.x;
-        const initialNodeY = position.y;
-
-        setIsDragging(true);
-        onSelect(node.id, e.shiftKey);
-
-        const handleMove = (moveEvent) => {
-            moveEvent.preventDefault();
-            const dx = moveEvent.clientX - initialMouseX;
-            const dy = moveEvent.clientY - initialMouseY;
-            onPositionChange(node.id, {
-                x: initialNodeX + dx,
-                y: initialNodeY + dy
-            });
-        };
-
-        const handleUp = (upEvent) => {
-            setIsDragging(false);
-            // Clear selection on any mouse up unless shift is pressed
-            if (!upEvent.shiftKey) {
-                onSelect(node.id, false);
-            }
-            window.removeEventListener('mousemove', handleMove);
-            window.removeEventListener('mouseup', handleUp);
-        };
-
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleUp);
+        onDragStart(node.id, e);
     };
+
 
     const addInput = () => {
         if (newInputName.trim()) {
@@ -287,14 +257,14 @@ const ComputationalNode = ({
             style={{
                 left: position.x,
                 top: position.y,
-                cursor: isDragging ? 'grabbing' : 'grab',
+                cursor: 'grab',
                 backgroundColor: backgroundColor,
                 WebkitUserSelect: 'none',
                 MozUserSelect: 'none',
                 msUserSelect: 'none',
                 userSelect: 'none',
                 transition: 'background-color 0.2s ease-in-out, transform 0.1s ease-in-out, border 0.2s ease-in-out',
-                transform: isDragging ? 'scale(1.02)' : 'scale(1)'
+                transform:  'scale(1)'
             }}
             onMouseDown={handleNodeDragStart}
         >
