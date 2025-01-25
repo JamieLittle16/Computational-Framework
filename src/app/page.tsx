@@ -1,6 +1,6 @@
 'use client';
 
-import ComputationalFramework from '@/components/computational-framework';
+import ComputationalFramework from '@/components/computational-framework/ComputationalFramework';
 import { useEffect } from 'react';
 
 export default function Home() {
