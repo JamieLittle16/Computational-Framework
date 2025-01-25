@@ -78,3 +78,7 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.selected-node {
+    border: 2px solid #3b82f6;
+  }
