@@ -327,12 +327,21 @@ const ComputationalFramework = () => {
     return (
         <div
             ref={containerRef}
-            className="relative w-full h-screen bg-gray-50 overflow-hidden"
+            className="relative w-full h-screen overflow-hidden bg-gray-50"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
         >
+            {/* Squared background that moves with panning */}
+            <div
+              className="absolute inset-0 bg-repeat"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0H20V20H0z' fill='white' /%3E%3Cpath d='M0 0H20V20H0Z' stroke='%23e0e0e0' stroke-width='0.5' fill='none' /%3E%3C/svg%3E")`,
+                 backgroundSize: '20px 20px',
+                 transform: `translate(${offset.x % 20}px, ${offset.y % 20}px)`
+              }}
+           />
             {/* UI Buttons (fixed relative to the screen) */}
             <div className="absolute top-4 left-4 z-10 flex gap-2">
                 <Button onClick={createNode} className="flex items-center gap-2">
