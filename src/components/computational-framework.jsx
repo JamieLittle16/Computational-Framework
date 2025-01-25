@@ -76,7 +76,23 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
           />
           <p className="text-sm text-gray-500">Maximum depth of evaluation to prevent infinite loops</p>
         </div>
-
+        <div className="space-y-2">
+          <Label htmlFor="delay">Update Delay (ms)</Label>
+          <Input
+            id="delay"
+            type="number"
+            min="0"
+            value={settings.delay}
+            onChange={(e) => {
+                const value = parseInt(e.target.value) || 100;
+                onSettingsChange({
+                    ...settings,
+                    delay: Math.max(0, value),
+                });
+            }}
+          />
+          <p className="text-sm text-gray-500">Delay before node updates in milliseconds.</p>
+        </div>
       <div className="flex items-center gap-2">
         <Checkbox
           id="colorMode"
@@ -245,9 +261,9 @@ const ComputationalNode = ({
             }
         };
 
-        const timeoutId = setTimeout(evaluateFormula, 100);
+        const timeoutId = setTimeout(evaluateFormula, settings.delay);
         return () => clearTimeout(timeoutId);
-    }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ, settings.modBase, settings.maxEvalDepth]);
+    }, [node.formula, node.inputs, node.useMod2, connections, allNodes, node.id, updateNodeQ, settings.modBase, settings.maxEvalDepth, settings.delay]);
 
     const handleNodeDragStart = (e) => {
         if (e.button !== 0 || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
@@ -542,7 +558,8 @@ const ComputationalFramework = () => {
         initialQ: 0,
         modBase: 2,
         maxEvalDepth: 100,
-        colorMode: false
+        colorMode: false,
+        delay: 100
     });
 
   const createNode = useCallback(() => {
