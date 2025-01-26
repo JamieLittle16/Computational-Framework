@@ -4,6 +4,7 @@ import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, X } fr
 import { useCallback, useEffect, useRef, useState, } from 'react';
 import ComputationalNode from './ComputationalNode';
 import SettingsPanel from './SettingsPanel';
+import * as math from 'mathjs';
 import styles from "./ComputationalFramework.module.css";
 
 const ComputationalFramework = () => {
@@ -23,7 +24,7 @@ const ComputationalFramework = () => {
     const [isDraggingNodes, setIsDraggingNodes] = useState(false);
     const [draggedNode, setDraggedNode] = useState(null);
     const copiedNodes = useRef([]);
-
+    const nodesRef = useRef(nodes);
     const [settings, setSettings] = useState({
         initialQ: 0,
         modBase: 2,
@@ -32,6 +33,172 @@ const ComputationalFramework = () => {
         delay: 100,
         selectionTintStrength: 0.15
     });
+    const connectionsRef = useRef(connections);
+    const settingsRef = useRef(settings);
+
+
+    useEffect(() => {
+        nodesRef.current = nodes;
+      }, [nodes]);
+
+      useEffect(() => {
+        connectionsRef.current = connections;
+      }, [connections]);
+
+      useEffect(() => {
+        settingsRef.current = settings;
+      }, [settings]);
+
+
+      const extractNodeDependencies = (formula, allNodes) => {
+        const nodeNames = allNodes.map(node => node.name.replace(/ /g, '_'));
+        const dependencyRegex = new RegExp(`\\b(${nodeNames.join('|')})\\b\\s*\\(`, 'g');
+
+        const dependencies = [];
+        let match;
+        while ((match = dependencyRegex.exec(formula)) !== null) {
+          dependencies.push(match[1]);
+        }
+
+        return dependencies.map(name => allNodes.find(n => n.name.replace(/ /g, '_') === name)?.id).filter(id => id);
+      };
+
+
+      const buildDependencyGraph = useCallback(() => {
+        const graph = new Map();
+        const inDegree = new Map();
+
+        nodesRef.current.forEach(node => {
+          graph.set(node.id, []);
+          inDegree.set(node.id, 0);
+        });
+
+        connectionsRef.current.forEach(conn => {
+          graph.get(conn.sourceId).push(conn.targetId);
+          inDegree.set(conn.targetId, inDegree.get(conn.targetId) + 1);
+        });
+
+        nodesRef.current.forEach(node => {
+            const dependencies = extractNodeDependencies(node.formula, nodesRef.current);
+            dependencies.forEach(dependencyId => {
+              graph.get(dependencyId).push(node.id);
+              inDegree.set(node.id, inDegree.get(node.id) + 1);
+            })
+        });
+
+        const queue = [];
+        inDegree.forEach((degree, nodeId) => {
+          if (degree === 0) queue.push(nodeId);
+        });
+
+        const sortedOrder = [];
+        while (queue.length > 0) {
+          const nodeId = queue.shift();
+          sortedOrder.push(nodeId);
+          graph.get(nodeId).forEach(dependentId => {
+            inDegree.set(dependentId, inDegree.get(dependentId) - 1);
+            if (inDegree.get(dependentId) === 0) queue.push(dependentId);
+          });
+        }
+
+        if (sortedOrder.length !== nodesRef.current.length) {
+          console.warn("Cycle detected in dependencies");
+          nodesRef.current.forEach(node => {
+            if (!sortedOrder.includes(node.id)) sortedOrder.push(node.id);
+          });
+        }
+
+        return sortedOrder;
+      }, []);
+
+
+      const evaluateNodeFormula = (node, allNodes, connections, settings) => {
+              const scope = {
+                q: node.q,
+                Q: () => node.q,
+                ...math
+              };
+
+              // Add inputs to scope
+              Object.entries(node.inputs).forEach(([inputName, input]) => {
+                if (input.isConnected) {
+                  const connection = connections.find(c =>
+                    c.targetId === node.id && c.inputName === inputName
+                  );
+                  const sourceNode = connection ?
+                    allNodes.find(n => n.id === connection.sourceId) : null;
+                  scope[inputName] = sourceNode ? sourceNode.q : 0;
+                } else {
+                  scope[inputName] = input.value;
+                }
+              });
+
+              // Add node references
+              allNodes.forEach(n => {
+                const sanitizedName = n.name.replace(/ /g, '_');
+                scope[sanitizedName] = () => {
+                  const targetNode = allNodes.find(nn => nn.id === n.id);
+                  return targetNode ? targetNode.q : 0;
+                };
+              });
+
+              let result;
+              try {
+                 result = math.evaluate(node.formula, scope);
+              } catch (e) {
+                throw new Error(`Formula error: ${e.message}`);
+              }
+
+              if (isNaN(result)) {
+                return 0; // Or any default value you prefer
+              }
+
+              return result;
+            };
+
+    const evaluateAllNodes = useCallback(() => {
+        const currentNodes = [...nodesRef.current];
+        const currentConnections = [...connectionsRef.current];
+        const currentSettings = settingsRef.current;
+        const sortedIds = buildDependencyGraph();
+
+        let hasUpdates = false;
+        const updatedNodes = currentNodes.map(node => ({ ...node }));
+
+        sortedIds.forEach(nodeId => {
+          const node = updatedNodes.find(n => n.id === nodeId);
+          if (!node) return;
+
+          let newQ, error = '';
+          try {
+            newQ = evaluateNodeFormula(node, updatedNodes, currentConnections, currentSettings);
+            if (node.useMod2) {
+              newQ = ((newQ % currentSettings.modBase) + currentSettings.modBase) % currentSettings.modBase;
+            }
+          } catch (e) {
+            newQ = 0;
+            error = e.message;
+          }
+
+            if (node.q !== newQ || node.error !== error) {
+              node.q = newQ;
+              node.error = error;
+              hasUpdates = true;
+            }
+
+        });
+
+        if (hasUpdates) {
+          setNodes(updatedNodes);
+        }
+      }, [buildDependencyGraph]);
+
+      useEffect(() => {
+        const timeoutId = setTimeout(evaluateAllNodes, settings.delay);
+        return () => clearTimeout(timeoutId);
+      }, [nodes, connections, settings, evaluateAllNodes, settings.delay]);
+
+
 
     const createNode = useCallback(() => {
         try {
@@ -50,7 +217,8 @@ const ComputationalFramework = () => {
                 formula: '',
                 useMod2: true,
                 q: settings.initialQ,
-                name: `Node ${nextNodeId}`
+                name: `Node ${nextNodeId}`,
+                error: ''
             };
             setNodes(prevNodes => [...prevNodes, newNode]);
             setNextNodeId(prevId => prevId + 1);
@@ -93,7 +261,10 @@ const ComputationalFramework = () => {
                 reader.onload = (e) => {
                     try {
                         const setup = JSON.parse(e.target.result);
-                        setNodes(setup.nodes);
+                        setNodes(setup.nodes.map(n => ({
+                            ...n,
+                            error: n.error || ''
+                          })));
                         setConnections(setup.connections);
                         setNextNodeId(setup.nextNodeId);
                         setOffset({ x: 0, y: 0 });
@@ -224,31 +395,16 @@ const ComputationalFramework = () => {
 
       const deleteSelectedConnections = useCallback(() => {
         try {
-              setSelectedConnections(prev => {
-                  const connectionsToDelete = Array.from(prev);
-                  setConnections(prevConns => prevConns.filter(conn => {
-                      const connectionString = `${conn.sourceId}-${conn.targetId}-${conn.inputName}`;
-                      return !connectionsToDelete.includes(connectionString);
-                  }));
-
-                    setNodes(prevNodes => prevNodes.map(node => {
-                        let updatedNode = { ...node };
-                        for(let connectionString of connectionsToDelete){
-                            const [sourceId, targetId, inputName] = connectionString.split("-");
-                            if (parseInt(targetId) === node.id) {
-                              updatedNode = {
-                                    ...updatedNode,
-                                    inputs: {
-                                        ...updatedNode.inputs,
-                                        [inputName]: { ...updatedNode.inputs[inputName], isConnected: false }
-                                    }
-                                };
-                            }
-                        }
-                      return updatedNode;
-                    }))
-                  return new Set();
-              });
+          setSelectedConnections(prev => {
+            const newSet = new Set(prev);
+            prev.forEach(connStr => {
+              const [sourceId, targetId] = connStr.split('-');
+              if (sourceId === id.toString() || targetId === id.toString()) {
+                newSet.delete(connStr);
+              }
+            });
+            return newSet;
+          });
         } catch (error) {
             console.error("Error deleting selected connections", error);
         }

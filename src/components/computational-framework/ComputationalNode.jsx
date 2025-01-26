@@ -43,11 +43,10 @@ const ComputationalNode = ({
   const isNodeSelected = useMemo(() => isSelected, [isSelected]);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nodeName, setNodeName] = useState(`Node ${node.id}`);
-  const [formulaError, setFormulaError] = useState('');
   const [newInputName, setNewInputName] = useState('');
   const [isDraggingConnection, setIsDraggingConnection] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-
+  const formulaError = node.error;
   const nodeRef = useRef(null);
   const evaluationDepth = useRef(0);
 
@@ -131,97 +130,6 @@ const ComputationalNode = ({
       return '';
     }
   }, [node, connections, allNodes, settings]);
-
-
-  useMemo(() => {
-    const evaluateFormula = () => {
-      try {
-        if (!node.formula) {
-          setFormulaError('');
-          return;
-        }
-
-        evaluationDepth.current = 0;
-        const evaluateWithDepthCheck = (nodeId, visited = new Set()) => {
-          if (evaluationDepth.current > settings.maxEvalDepth) {
-            throw new Error('Maximum evaluation depth exceeded');
-          }
-          evaluationDepth.current++;
-
-          const currentNode = allNodes.find(n => n.id === nodeId);
-          if (!currentNode || visited.has(nodeId)) return 0;
-          visited.add(nodeId);
-
-          const nodeCall = (calledNodeId) => {
-            if (evaluationDepth.current > settings.maxEvalDepth) {
-              throw new Error('Maximum evaluation depth exceeded');
-            }
-            return evaluateWithDepthCheck(calledNodeId, new Set(visited));
-          }
-          const scope = {
-            q: currentNode.q,
-            Q: currentNode.q,
-            ...Object.entries(currentNode.inputs).reduce((acc, [key, input]) => {
-              if (input.isConnected) {
-                const connection = connections.find(c => c.targetId === currentNode.id && c.inputName === key);
-                if (connection) {
-                  acc[key] = evaluateWithDepthCheck(connection.sourceId, new Set(visited));
-                }
-              } else {
-                acc[key] = input.value;
-              }
-              return acc;
-            }, {}),
-            ...allNodes.reduce((acc, n) => {
-              const sanitizedName = n.name.replace(/ /g, '_');
-              acc[sanitizedName] = () => nodeCall(n.id);
-              return acc;
-            }, {}),
-            ...math
-          };
-
-
-          try {
-            const matches = currentNode.formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
-            const undefinedVars = matches.filter(v => scope[v] === undefined);
-            if (undefinedVars.length > 0) {
-              throw new Error(`Undefined variables: ${undefinedVars.join(', ')}`);
-            }
-            let result = math.evaluate(currentNode.formula, scope);
-            if (currentNode.useMod2) {
-              result = ((result % settings.modBase) + settings.modBase) % settings.modBase;
-            }
-            return result;
-          } catch (e) {
-            throw new Error(`Error in formula: ${e.message}`);
-          }
-        };
-
-        const result = evaluateWithDepthCheck(node.id);
-        setFormulaError('');
-        if (node.q !== result) {
-          updateNodeQ(node.id, result);
-
-          // Find downstream nodes and trigger update
-          const downstreamNodes = connections
-            .filter(c => c.sourceId === node.id)
-            .map(c => allNodes.find(n => n.id === c.targetId))
-            .filter(downstreamNode => !!downstreamNode);
-
-          downstreamNodes.forEach(downstreamNode => {
-            updateNodeQ(downstreamNode.id, downstreamNode.q)
-          })
-        }
-      } catch (error) {
-        setFormulaError(error.message);
-        updateNodeQ(node.id, 0);
-      }
-    };
-
-    const timeoutId = setTimeout(evaluateFormula, settings.delay);
-    return () => clearTimeout(timeoutId);
-  }, [effectDependencies, settings.delay, updateNodeQ, node.formula, node.useMod2, node.id, connections, allNodes, settings.maxEvalDepth, settings.modBase]);
-
 
   const handleNodeDragStart = (e) => {
     onDragStart(node.id, e);
