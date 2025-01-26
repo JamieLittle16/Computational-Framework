@@ -6,7 +6,8 @@ import ComputationalNode from './ComputationalNode';
 import SettingsPanel from './SettingsPanel';
 import * as math from 'mathjs';
 import styles from "./ComputationalFramework.module.css";
-import { isEqual } from 'lodash'; // Install with npm install lodash
+import { isEqual } from 'lodash';
+import hsvToRgb from '@/utils/colourUtils'
 
 const ComputationalFramework = () => {
     const [nodes, setNodes] = useState([]);
@@ -808,7 +809,15 @@ const ComputationalFramework = () => {
                     const dx = targetX - sourceX;
                     const controlX = Math.abs(dx) * 0.5;
                     const connectionString = `${conn.sourceId}-${conn.targetId}-${conn.inputName}`;
+                    let connectionColor = "#666"
+                    if(settings.colorMode){
+                      const hue = Math.max(0, Math.min(360, (sourceNode.q / settings.modBase) * 360));
+                      const saturation = 0.8;
+                      const value = 1;
+                       const rgb = hsvToRgb(hue, saturation, value);
+                       connectionColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
+                    }
                     return (
                         <g key={idx}
 
@@ -832,7 +841,7 @@ const ComputationalFramework = () => {
          C ${sourceX + controlX} ${sourceY},
            ${targetX - controlX} ${targetY},
            ${targetX} ${targetY}`}
-                                stroke={selectedConnections.has(connectionString) ? "rgb(59, 130, 246)" : "#666"}
+                                stroke={selectedConnections.has(connectionString) ? "rgb(59, 130, 246)" : connectionColor}
                                 strokeWidth={selectedConnections.has(connectionString) ? "4" : "2"}
                                 fill="none"
                                 style={{ cursor: 'pointer' }}
