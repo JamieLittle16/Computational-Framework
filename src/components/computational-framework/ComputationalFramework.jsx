@@ -222,6 +222,38 @@ const ComputationalFramework = () => {
         }
     }, []);
 
+      const deleteSelectedConnections = useCallback(() => {
+        try {
+              setSelectedConnections(prev => {
+                  const connectionsToDelete = Array.from(prev);
+                  setConnections(prevConns => prevConns.filter(conn => {
+                      const connectionString = `${conn.sourceId}-${conn.targetId}-${conn.inputName}`;
+                      return !connectionsToDelete.includes(connectionString);
+                  }));
+
+                    setNodes(prevNodes => prevNodes.map(node => {
+                        let updatedNode = { ...node };
+                        for(let connectionString of connectionsToDelete){
+                            const [sourceId, targetId, inputName] = connectionString.split("-");
+                            if (parseInt(targetId) === node.id) {
+                              updatedNode = {
+                                    ...updatedNode,
+                                    inputs: {
+                                        ...updatedNode.inputs,
+                                        [inputName]: { ...updatedNode.inputs[inputName], isConnected: false }
+                                    }
+                                };
+                            }
+                        }
+                      return updatedNode;
+                    }))
+                  return new Set();
+              });
+        } catch (error) {
+            console.error("Error deleting selected connections", error);
+        }
+    }, []);
+
     const updateNodeQ = useCallback((id, newQ) => {
         try {
             setNodes(prevNodes =>
@@ -285,8 +317,8 @@ const ComputationalFramework = () => {
         }
     };
 
-    const handleMouseDown = (e) => {
-        try {
+     const handleMouseDown = (e) => {
+          try {
             if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
                 setIsPanning(true);
                 lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -445,6 +477,7 @@ const ComputationalFramework = () => {
                 pasteCopiedNodes();
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
                 deleteSelectedNodes();
+                deleteSelectedConnections();
             }
         };
 
@@ -453,7 +486,7 @@ const ComputationalFramework = () => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [copySelectedNodes, pasteCopiedNodes, deleteSelectedNodes]);
+    }, [copySelectedNodes, pasteCopiedNodes, deleteSelectedNodes, deleteSelectedConnections]);
 
     return (
         <div
@@ -543,7 +576,7 @@ const ComputationalFramework = () => {
                 ))}
             </div>
 
-            {/* Connections (fixed relative to the screen) */}
+             {/* Connections (fixed relative to the screen) */}
             <svg
                 className="absolute top-0 left-0 w-full h-full pointer-events-none"
                 style={{ zIndex: 1 }}
@@ -564,11 +597,22 @@ const ComputationalFramework = () => {
 
                     return (
                         <g key={idx}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleConnectionSelect(conn.sourceId, conn.targetId, conn.inputName, e.shiftKey);
-                            }}
+
                         >
+                         <path
+                                d={`M ${sourceX} ${sourceY}
+         C ${sourceX + controlX} ${sourceY},
+           ${targetX - controlX} ${targetY},
+           ${targetX} ${targetY}`}
+                                stroke="transparent"
+                                strokeWidth="15"
+                                fill="none"
+                                style={{pointerEvents: 'auto'}}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConnectionSelect(conn.sourceId, conn.targetId, conn.inputName, e.shiftKey);
+                                }}
+                            />
                             <path
                                 d={`M ${sourceX} ${sourceY}
          C ${sourceX + controlX} ${sourceY},
@@ -589,7 +633,7 @@ const ComputationalFramework = () => {
             {/* Selection Box (fixed relative to the screen) */}
             {selectionBox && (
                 <div
-                    className="absolute border border-blue-500 bg-blue-100 bg-opacity-20" // Changed bg-opacity-10 to bg-opacity-20 and added background
+                    className="absolute border border-blue-500 bg-blue-100 bg-opacity-20"
                     style={{
                         left: selectionBox.x + offset.x,
                         top: selectionBox.y + offset.y,
