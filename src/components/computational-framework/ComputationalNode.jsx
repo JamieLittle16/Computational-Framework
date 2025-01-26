@@ -38,7 +38,8 @@ const ComputationalNode = React.memo(({
   isSelected,
   onSelect,
   settings,
-  onDragStart
+  onDragStart,
+  handleInputChange
 }) => {
 
     const isNodeSelected = useMemo(() => isSelected, [isSelected]);
@@ -274,13 +275,7 @@ const ComputationalNode = React.memo(({
                             value={input.isConnected ? getConnectedInputValue(name) : (input.value === 0 ? '' : input.value)}
                             onChange={(e) => {
                                 const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                updateNode(node.id, {
-                                ...node,
-                                  inputs: {
-                                      ...node.inputs,
-                                      [name]: { ...input, value: isNaN(value) ? 0 : value }
-                                  }
-                                });
+                                handleInputChange(node.id, name, isNaN(value) ? 0 : value)
                             }}
                             disabled={input.isConnected}
                             className="h-8"

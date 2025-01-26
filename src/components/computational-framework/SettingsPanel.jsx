@@ -1,7 +1,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 // Settings component
 const SettingsPanel = ({ settings, onSettingsChange }) => {
@@ -41,30 +41,30 @@ const SettingsPanel = ({ settings, onSettingsChange }) => {
 
   return newErrors
  }, [localValues]);
- useEffect(() => {
-  setErrors(validateInputs)
- }, [validateInputs])
- const hasErrors = Object.values(errors).some(error => error !== '')
 
- const handleInputChange = (e, id, defaultValue) => {
-  const rawValue = e.target.value;
-  const value = rawValue === "" ? defaultValue : parseFloat(rawValue);
-  setLocalValues(prev => ({
-   ...prev,
-   [id]: { value: isNaN(value) ? defaultValue : value, isDefault: rawValue === "" }
-  }))
- };
+  useEffect(() => {
+   setErrors(validateInputs);
+ }, [validateInputs]);
 
- const handleBlur = (id) => {
-  if (errors[id] === '') {
-   onSettingsChange(prev => ({
-    ...prev,
-    [id]: localValues[id].value
-   }))
-  }
+ const hasErrors = Object.values(errors).some(error => error !== '');
 
- };
+ const handleInputChange = useCallback((e, id, defaultValue) => {
+   const rawValue = e.target.value;
+   const value = rawValue === "" ? defaultValue : parseFloat(rawValue);
+   setLocalValues(prev => ({
+     ...prev,
+     [id]: { value: isNaN(value) ? defaultValue : value, isDefault: rawValue === "" }
+    }));
+  }, []);
 
+ const handleBlur = useCallback((id) => {
+   if (errors[id] === '') {
+     onSettingsChange(prev => ({
+      ...prev,
+      [id]: localValues[id].value
+     }));
+   }
+ }, [errors, localValues, onSettingsChange]);
 
  return (
   <div className="space-y-6">

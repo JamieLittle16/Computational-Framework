@@ -38,6 +38,9 @@ const ComputationalFramework = () => {
     const settingsRef = useRef(settings);
     // Store dependency regex for reuse
     const [dependencyRegex, setDependencyRegex] = useState(null);
+    const [cachedDependencyGraph, setCachedDependencyGraph] = useState(null);
+    const [cachedNodes, setCachedNodes] = useState(null);
+     const [inputTimeoutIds, setInputTimeoutIds] = useState(new Map());
 
     //Update refs
     useEffect(() => {
@@ -169,19 +172,36 @@ const ComputationalFramework = () => {
       return result;
     }, []);
 
+     const updateNode = useCallback((id, updatedNode) => {
+        try {
+            setNodes(prevNodes =>
+                prevNodes.map(node => node.id === id ? updatedNode : node)
+            );
+            setCachedDependencyGraph(null); // Invalidate graph cache
+        } catch (error) {
+            console.error("Error updating node:", error);
+        }
+    }, []);
     // Evaluate nodes only when necessary
     const evaluateAllNodes = useCallback(() => {
         const currentNodes = nodesRef.current.map(node => ({ ...node }));
         const currentConnections = [...connectionsRef.current];
         const currentSettings = settingsRef.current;
-        const sortedIds = buildDependencyGraph();
+        let sortedIds = cachedDependencyGraph;
+         if (!sortedIds) {
+            sortedIds = buildDependencyGraph();
+            setCachedDependencyGraph(sortedIds);
+        }
 
-
+         const nodeMap = new Map(currentNodes.map(node => [node.id, { ...node }]));
          let hasUpdates = false;
-         const updatedNodes = currentNodes.map(node => ({ ...node }));
+        const updatedNodes = currentNodes.map(node => {
+             const copy = nodeMap.get(node.id);
+             return copy;
+          });
 
          sortedIds.forEach(nodeId => {
-              const node = updatedNodes.find(n => n.id === nodeId);
+            const node = updatedNodes.find(n => n.id === nodeId);
              if (!node) return;
 
              const scope = createEvaluationScope(node, updatedNodes, currentConnections, currentSettings);
@@ -197,23 +217,21 @@ const ComputationalFramework = () => {
                    newQ = 0;
                    error = e.message;
                 }
-                 if (node.q !== newQ || node.error !== error) {
-                    node.q = newQ;
-                    node.error = error;
+                if (node.q !== newQ || node.error !== error) {
+                   node.q = newQ;
+                   node.error = error;
                     hasUpdates = true;
                 }
-
-
          });
 
          if (hasUpdates) {
-            setNodes(prevNodes => {
-                if (isEqual(prevNodes, updatedNodes)) return prevNodes;
+             setNodes(prevNodes => {
+                if (isEqual(prevNodes.map(n => ({...n})), updatedNodes)) return prevNodes;
                 return updatedNodes;
             });
-        }
+         }
 
-    }, [buildDependencyGraph, createEvaluationScope, evaluateNodeFormula]);
+    }, [buildDependencyGraph, createEvaluationScope, evaluateNodeFormula, cachedDependencyGraph]);
 
 
     // Evaluate nodes with a delay
@@ -244,6 +262,7 @@ const ComputationalFramework = () => {
             };
             setNodes(prevNodes => [...prevNodes, newNode]);
             setNextNodeId(prevId => prevId + 1);
+            setCachedDependencyGraph(null); // Invalidate graph cache
         } catch (error) {
             console.error("Error creating node:", error);
         }
@@ -283,13 +302,14 @@ const ComputationalFramework = () => {
                 reader.onload = (e) => {
                     try {
                         const setup = JSON.parse(e.target.result);
-                        setNodes(setup.nodes.map(n => ({
+                         setNodes(setup.nodes.map(n => ({
                             ...n,
                             error: n.error || ''
                           })));
                         setConnections(setup.connections);
                         setNextNodeId(setup.nextNodeId);
                         setOffset({ x: 0, y: 0 });
+                         setCachedDependencyGraph(null); // Invalidate graph cache
                         if (setup.settings) {
                             setSettings(setup.settings);
                         }
@@ -304,15 +324,28 @@ const ComputationalFramework = () => {
         }
     };
 
-    const updateNode = useCallback((id, updatedNode) => {
-        try {
-            setNodes(prevNodes =>
-                prevNodes.map(node => node.id === id ? updatedNode : node)
-            );
-        } catch (error) {
-            console.error("Error updating node:", error);
-        }
-    }, []);
+     const handleNodeInputChange = useCallback((nodeId, inputName, value) => {
+        if (inputTimeoutIds.current.has(nodeId)) {
+            clearTimeout(inputTimeoutIds.current.get(nodeId));
+          }
+
+        const timeoutId = setTimeout(() => {
+            updateNode(nodeId, prevNode => ({
+               ...prevNode,
+                inputs: {
+                ...prevNode.inputs,
+                    [inputName]: { ...prevNode.inputs[inputName], value: value }
+               }
+            }));
+            inputTimeoutIds.current.delete(nodeId);
+            setInputTimeoutIds(new Map(inputTimeoutIds.current));
+        }, settings.delay / 2);
+
+        inputTimeoutIds.current.set(nodeId, timeoutId);
+        setInputTimeoutIds(new Map(inputTimeoutIds.current));
+
+    }, [updateNode, settings.delay, inputTimeoutIds]);
+
 
     const deleteNode = useCallback((id) => {
         try {
@@ -320,6 +353,7 @@ const ComputationalFramework = () => {
             setConnections(prevConns =>
                 prevConns.filter(conn => conn.sourceId !== id && conn.targetId !== id)
             );
+             setCachedDependencyGraph(null); // Invalidate graph cache
         } catch (error) {
             console.error("Error deleting node:", error);
         }
@@ -371,7 +405,7 @@ const ComputationalFramework = () => {
 
             setNodes(prevNodes => [...prevNodes, ...newNodes]);
             setNextNodeId(prevId => prevId + newNodes.length);
-
+             setCachedDependencyGraph(null); // Invalidate graph cache
         } catch (error) {
             console.error("Error pasting node:", error);
         }
@@ -445,52 +479,52 @@ const ComputationalFramework = () => {
     }, []);
 
     const handleNodeSelect = (nodeId, isShiftKey) => {
-        try {
+          try {
             setSelectedNodes(prev => {
-                const newSelection = new Set(prev);
-                if (isShiftKey) {
-                    if (newSelection.has(nodeId)) {
-                        newSelection.delete(nodeId);
-                    } else {
-                        newSelection.add(nodeId);
-                    }
+              const newSelection = new Set(prev);
+              if (isShiftKey) {
+                if (newSelection.has(nodeId)) {
+                  newSelection.delete(nodeId);
                 } else {
-                    if (newSelection.size === 1 && newSelection.has(nodeId)) {
-                        newSelection.clear();
-                    } else {
-                        newSelection.clear();
-                        newSelection.add(nodeId);
-                    }
+                  newSelection.add(nodeId);
                 }
-                return newSelection;
+              } else {
+                if (newSelection.size === 1 && newSelection.has(nodeId)) {
+                  newSelection.clear();
+                } else {
+                  newSelection.clear();
+                  newSelection.add(nodeId);
+                }
+              }
+              return newSelection;
             });
-        } catch (error) {
+          } catch (error) {
             console.error("Error selecting node:", error);
-        }
+          }
     };
 
-    const handleConnectionSelect = (sourceId, targetId, inputName, isShiftKey) => {
+   const handleConnectionSelect = (sourceId, targetId, inputName, isShiftKey) => {
         try {
             setSelectedConnections(prev => {
-                const newSelection = new Set(prev);
-                const connectionString = `${sourceId}-${targetId}-${inputName}`;
-                if (isShiftKey) {
-                    if (newSelection.has(connectionString)) {
-                        newSelection.delete(connectionString);
-                    } else {
-                        newSelection.add(connectionString);
-                    }
+              const newSelection = new Set(prev);
+              const connectionString = `${sourceId}-${targetId}-${inputName}`;
+              if (isShiftKey) {
+                if (newSelection.has(connectionString)) {
+                  newSelection.delete(connectionString);
                 } else {
-                    if (newSelection.size === 1 && newSelection.has(connectionString)) {
-                        newSelection.clear();
-                    } else {
-                        newSelection.clear();
-                        newSelection.add(connectionString);
-                    }
+                  newSelection.add(connectionString);
                 }
-                return newSelection;
+              } else {
+                 if (newSelection.size === 1 && newSelection.has(connectionString)) {
+                    newSelection.clear();
+                  } else {
+                    newSelection.clear();
+                   newSelection.add(connectionString);
+                  }
+              }
+               return newSelection;
             });
-        } catch (error) {
+          } catch (error) {
             console.error("Error selecting connection:", error);
         }
     };
@@ -577,7 +611,7 @@ const ComputationalFramework = () => {
                 return;
             }
 
-            if (isSelecting && selectionStart) {
+             if (isSelecting && selectionStart) {
                 const rect = containerRef.current.getBoundingClientRect();
                 const currentX = e.clientX - rect.left - offset.x;
                 const currentY = e.clientY - rect.top - offset.y;
@@ -591,28 +625,28 @@ const ComputationalFramework = () => {
 
                 setSelectionBox(newSelectionBox);
 
-                const newSelectedNodes = new Set();
-                nodes.forEach(node => {
-                    const nodeRect = {
+                 const newSelectedNodes = new Set();
+                 nodes.forEach(node => {
+                  const nodeRect = {
                         left: node.position.x,
                         right: node.position.x + 320,
                         top: node.position.y,
                         bottom: node.position.y + 200
-                    };
+                  };
 
-                    if (
-                        nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
-                        nodeRect.right > newSelectionBox.x &&
-                        nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
-                        nodeRect.bottom > newSelectionBox.y
+                     if (
+                         nodeRect.left < newSelectionBox.x + newSelectionBox.width &&
+                          nodeRect.right > newSelectionBox.x &&
+                           nodeRect.top < newSelectionBox.y + newSelectionBox.height &&
+                            nodeRect.bottom > newSelectionBox.y
                     ) {
                         newSelectedNodes.add(node.id);
                     }
-                });
+                 });
 
                 setSelectedNodes(newSelectedNodes);
                 setSelectedConnections(new Set());
-            }
+              }
         } catch (error) {
             console.error("Error handling mouse move:", error);
         }
@@ -728,6 +762,7 @@ const ComputationalFramework = () => {
                 className="absolute"
                 style={{
                     transform: `translate(${offset.x}px, ${offset.y}px)`,
+                    willChange: 'transform',
                 }}
                 ref={boundaryRef}
             >
@@ -748,6 +783,7 @@ const ComputationalFramework = () => {
                         updateNodeQ={updateNodeQ}
                         isSelected={selectedNodes.has(node.id)}
                         onSelect={handleNodeSelect}
+                         handleInputChange = {handleNodeInputChange}
                         settings={settings}
                         onDragStart={handleNodeDragStart}
                     />
