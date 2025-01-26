@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ComputationalNode from './ComputationalNode';
 import SettingsPanel from './SettingsPanel';
 import * as math from 'mathjs';
 import styles from "./ComputationalFramework.module.css";
+import { isEqual } from 'lodash'; // Install with npm install lodash
 
 const ComputationalFramework = () => {
     const [nodes, setNodes] = useState([]);
@@ -35,33 +36,41 @@ const ComputationalFramework = () => {
     });
     const connectionsRef = useRef(connections);
     const settingsRef = useRef(settings);
+    // Store dependency regex for reuse
+    const [dependencyRegex, setDependencyRegex] = useState(null);
 
-
+    //Update refs
     useEffect(() => {
         nodesRef.current = nodes;
-      }, [nodes]);
+    }, [nodes]);
 
-      useEffect(() => {
+    useEffect(() => {
         connectionsRef.current = connections;
-      }, [connections]);
+    }, [connections]);
 
-      useEffect(() => {
+    useEffect(() => {
         settingsRef.current = settings;
-      }, [settings]);
+    }, [settings]);
+
+     // Generate and update the regex for dependencies only when node names change
+    useEffect(() => {
+         const nodeNames = nodes.map(node => node.name.replace(/ /g, '_'));
+         const regex = new RegExp(`\\b(${nodeNames.join('|')})\\b\\s*\\(`, 'g');
+         setDependencyRegex(regex);
+    }, [nodes]);
 
 
-      const extractNodeDependencies = (formula, allNodes) => {
-        const nodeNames = allNodes.map(node => node.name.replace(/ /g, '_'));
-        const dependencyRegex = new RegExp(`\\b(${nodeNames.join('|')})\\b\\s*\\(`, 'g');
-
+    // Optimized dependency extraction using pre-compiled regex
+    const extractNodeDependencies = useCallback((formula, allNodes) => {
+        if (!dependencyRegex) return [];
         const dependencies = [];
         let match;
         while ((match = dependencyRegex.exec(formula)) !== null) {
-          dependencies.push(match[1]);
+            dependencies.push(match[1]);
         }
 
         return dependencies.map(name => allNodes.find(n => n.name.replace(/ /g, '_') === name)?.id).filter(id => id);
-      };
+    }, [dependencyRegex]);
 
 
       const buildDependencyGraph = useCallback(() => {
@@ -109,96 +118,109 @@ const ComputationalFramework = () => {
         }
 
         return sortedOrder;
-      }, []);
+      }, [extractNodeDependencies]); // Only rebuild when extract changes
+
+    // Create a reusable scope object
+    const createEvaluationScope = useCallback((node, allNodes, connections, settings) => {
+        const scope = {
+             q: node.q,
+             Q: () => node.q,
+            ...math
+        };
+         // Add inputs to scope
+        Object.entries(node.inputs).forEach(([inputName, input]) => {
+            if (input.isConnected) {
+              const connection = connections.find(c =>
+                c.targetId === node.id && c.inputName === inputName
+              );
+              const sourceNode = connection ?
+                allNodes.find(n => n.id === connection.sourceId) : null;
+              scope[inputName] = sourceNode ? sourceNode.q : 0;
+            } else {
+                scope[inputName] = input.value;
+            }
+        });
+         // Add node references
+            allNodes.forEach(n => {
+             const sanitizedName = n.name.replace(/ /g, '_');
+             scope[sanitizedName] = () => {
+               const targetNode = allNodes.find(nn => nn.id === n.id);
+               return targetNode ? targetNode.q : 0;
+             };
+           });
+        return scope;
+    }, []);
 
 
-      const evaluateNodeFormula = (node, allNodes, connections, settings) => {
-              const scope = {
-                q: node.q,
-                Q: () => node.q,
-                ...math
-              };
 
-              // Add inputs to scope
-              Object.entries(node.inputs).forEach(([inputName, input]) => {
-                if (input.isConnected) {
-                  const connection = connections.find(c =>
-                    c.targetId === node.id && c.inputName === inputName
-                  );
-                  const sourceNode = connection ?
-                    allNodes.find(n => n.id === connection.sourceId) : null;
-                  scope[inputName] = sourceNode ? sourceNode.q : 0;
-                } else {
-                  scope[inputName] = input.value;
-                }
-              });
+    const evaluateNodeFormula = useCallback((node, scope, settings) => {
 
-              // Add node references
-              allNodes.forEach(n => {
-                const sanitizedName = n.name.replace(/ /g, '_');
-                scope[sanitizedName] = () => {
-                  const targetNode = allNodes.find(nn => nn.id === n.id);
-                  return targetNode ? targetNode.q : 0;
-                };
-              });
+      let result;
+      try {
+         result = math.evaluate(node.formula, scope);
+      } catch (e) {
+        throw new Error(`Formula error: ${e.message}`);
+      }
 
-              let result;
-              try {
-                 result = math.evaluate(node.formula, scope);
-              } catch (e) {
-                throw new Error(`Formula error: ${e.message}`);
-              }
+      if (isNaN(result)) {
+        return 0;
+      }
 
-              if (isNaN(result)) {
-                return 0; // Or any default value you prefer
-              }
+      return result;
+    }, []);
 
-              return result;
-            };
-
+    // Evaluate nodes only when necessary
     const evaluateAllNodes = useCallback(() => {
-        const currentNodes = [...nodesRef.current];
+        const currentNodes = nodesRef.current.map(node => ({ ...node }));
         const currentConnections = [...connectionsRef.current];
         const currentSettings = settingsRef.current;
         const sortedIds = buildDependencyGraph();
 
-        let hasUpdates = false;
-        const updatedNodes = currentNodes.map(node => ({ ...node }));
 
-        sortedIds.forEach(nodeId => {
-          const node = updatedNodes.find(n => n.id === nodeId);
-          if (!node) return;
+         let hasUpdates = false;
+         const updatedNodes = currentNodes.map(node => ({ ...node }));
 
-          let newQ, error = '';
-          try {
-            newQ = evaluateNodeFormula(node, updatedNodes, currentConnections, currentSettings);
-            if (node.useMod2) {
-              newQ = ((newQ % currentSettings.modBase) + currentSettings.modBase) % currentSettings.modBase;
-            }
-          } catch (e) {
-            newQ = 0;
-            error = e.message;
-          }
+         sortedIds.forEach(nodeId => {
+              const node = updatedNodes.find(n => n.id === nodeId);
+             if (!node) return;
 
-            if (node.q !== newQ || node.error !== error) {
-              node.q = newQ;
-              node.error = error;
-              hasUpdates = true;
-            }
+             const scope = createEvaluationScope(node, updatedNodes, currentConnections, currentSettings);
 
-        });
 
-        if (hasUpdates) {
-          setNodes(updatedNodes);
+                let newQ, error = '';
+                try {
+                  newQ = evaluateNodeFormula(node, scope, currentSettings);
+                  if (node.useMod2) {
+                      newQ = ((newQ % currentSettings.modBase) + currentSettings.modBase) % currentSettings.modBase;
+                  }
+                } catch (e) {
+                   newQ = 0;
+                   error = e.message;
+                }
+                 if (node.q !== newQ || node.error !== error) {
+                    node.q = newQ;
+                    node.error = error;
+                    hasUpdates = true;
+                }
+
+
+         });
+
+         if (hasUpdates) {
+            setNodes(prevNodes => {
+                if (isEqual(prevNodes, updatedNodes)) return prevNodes;
+                return updatedNodes;
+            });
         }
-      }, [buildDependencyGraph]);
 
-      useEffect(() => {
-        const timeoutId = setTimeout(evaluateAllNodes, settings.delay);
-        return () => clearTimeout(timeoutId);
-      }, [nodes, connections, settings, evaluateAllNodes, settings.delay]);
+    }, [buildDependencyGraph, createEvaluationScope, evaluateNodeFormula]);
 
 
+    // Evaluate nodes with a delay
+    useEffect(() => {
+       const timeoutId = setTimeout(evaluateAllNodes, settings.delay);
+       return () => clearTimeout(timeoutId);
+    }, [evaluateAllNodes, settings.delay]);
 
     const createNode = useCallback(() => {
         try {
