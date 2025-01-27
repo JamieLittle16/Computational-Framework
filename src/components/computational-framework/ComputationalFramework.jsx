@@ -450,22 +450,21 @@ const ComputationalFramework = () => {
         }
     }, []);
 
-      const deleteSelectedConnections = useCallback(() => {
+    const deleteSelectedConnections = useCallback(() => {
         try {
-          setSelectedConnections(prev => {
-            const newSet = new Set(prev);
-            prev.forEach(connStr => {
-              const [sourceId, targetId] = connStr.split('-');
-              if (sourceId === id.toString() || targetId === id.toString()) {
-                newSet.delete(connStr);
-              }
+            setConnections(prevConns => {
+                const connectionsToDelete = Array.from(selectedConnections);
+                return prevConns.filter(conn => {
+                    const connectionString = `${conn.sourceId}-${conn.targetId}-${conn.inputName}`;
+                    return !connectionsToDelete.includes(connectionString);
+                });
             });
-            return newSet;
-          });
+            setSelectedConnections(new Set()); // Clear selection after deleting connections
         } catch (error) {
             console.error("Error deleting selected connections", error);
         }
-    }, []);
+    }, [selectedConnections]);
+
 
     const updateNodeQ = useCallback((id, newQ) => {
         try {
