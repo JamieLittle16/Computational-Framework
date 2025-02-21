@@ -41,7 +41,7 @@ const ComputationalFramework = () => {
     const [dependencyRegex, setDependencyRegex] = useState(null);
     const [cachedDependencyGraph, setCachedDependencyGraph] = useState(null);
     const [cachedNodes, setCachedNodes] = useState(null);
-     const [inputTimeoutIds, setInputTimeoutIds] = useState(new Map());
+    const [inputTimeoutIds, setInputTimeoutIds] = useState(new Map());
 
     //Update refs
     useEffect(() => {
@@ -303,7 +303,7 @@ const ComputationalFramework = () => {
                 reader.onload = (e) => {
                     try {
                         const setup = JSON.parse(e.target.result);
-                         setNodes(setup.nodes.map(n => ({
+                         setNodes(setup.nodes.mapReact.FC(n => ({
                             ...n,
                             error: n.error || ''
                           })));
@@ -325,28 +325,42 @@ const ComputationalFramework = () => {
         }
     };
 
-     const handleNodeInputChange = useCallback((nodeId, inputName, value) => {
-        if (inputTimeoutIds.current.has(nodeId)) {
-            clearTimeout(inputTimeoutIds.current.get(nodeId));
+    const handleNodeInputChange = useCallback((nodeId, inputName, value) => {
+        setInputTimeoutIds(prevInputTimeoutIds => {
+          const newInputTimeoutIds = new Map(prevInputTimeoutIds);
+          const existingTimeoutId = newInputTimeoutIds.get(nodeId);
+
+          if (existingTimeoutId) {
+            clearTimeout(existingTimeoutId);
           }
 
-        const timeoutId = setTimeout(() => {
-            updateNode(nodeId, prevNode => ({
-               ...prevNode,
-                inputs: {
-                ...prevNode.inputs,
-                    [inputName]: { ...prevNode.inputs[inputName], value: value }
-               }
-            }));
-            inputTimeoutIds.current.delete(nodeId);
-            setInputTimeoutIds(new Map(inputTimeoutIds.current));
-        }, settings.delay / 2);
+          const timeoutId = setTimeout(() => {
+            setInputTimeoutIds(currentInputTimeoutIds => {
+              const updatedInputTimeoutIds = new Map(currentInputTimeoutIds);
+              updatedInputTimeoutIds.delete(nodeId);
+              return updatedInputTimeoutIds;
+            });
 
-        inputTimeoutIds.current.set(nodeId, timeoutId);
-        setInputTimeoutIds(new Map(inputTimeoutIds.current));
+            setNodes(prevNodes => {
+              return prevNodes.map(node => {
+                if (node.id === nodeId) {
+                  return {
+                    ...node,
+                    inputs: {
+                      ...node.inputs,
+                      [inputName]: { ...node.inputs[inputName], value: value }
+                    }
+                  };
+                }
+                return node;
+              });
+            });
+          }, settings.delay / 2);
 
-    }, [updateNode, settings.delay, inputTimeoutIds]);
-
+          newInputTimeoutIds.set(nodeId, timeoutId);
+          return newInputTimeoutIds;
+        });
+      }, [settings.delay]);
 
     const deleteNode = useCallback((id) => {
         try {
