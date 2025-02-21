@@ -128,7 +128,7 @@ const ComputationalFramework = () => {
     const createEvaluationScope = useCallback((node, allNodes, connections, settings) => {
         const scope = {
              q: node.q,
-             Q: () => node.q,
+             Q: node.q,
             ...math
         };
          // Add inputs to scope
