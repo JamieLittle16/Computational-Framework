@@ -42,10 +42,10 @@ Expected Answer Example (ultra simplified):
       "id": "dFlipFlop",
       "type": "operation",
       "operation": "*",
-      "formula": "c*(q+d)+q",
+      "formula": "a*(q+b)+q",
       "inputs": {
-        "c": {},
-        "d": {}
+        "a": {},
+        "b": {}
       }
     }
   ],
@@ -59,7 +59,7 @@ When generating your answer:
 3. Consider modular arithmetic reductions such as 2 being equivalent to 0 in mod 2.
 4. Output ONLY a valid JSON code block with the described structure and no extra text.
 
-Remember: Efficiency, simplicity, valid JSON, and proper modular congruency considerations are paramount.
+Remember: Efficiency, simplicity, valid JSON, and proper modular congruency considerations are paramount. Ensure inputs to nodes match formula
 `;
 
 export default basePrompt;
