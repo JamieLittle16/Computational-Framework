@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { X } from 'lucide-react';
 // import PreviewCard from './PreviewCard';
 import ComputationalNode from './ComputationalNode';
+import basePrompt from './basePrompt'; // Import the base prompt
 
 const MODEL_CONFIGS = {
     OPENAI: {
@@ -50,6 +51,7 @@ const AIHelper = ({
     settings,
     createNode,
     createConnection,
+    updateNode,
     onClose
 }) => {
     const [prompt, setPrompt] = useState('');
@@ -114,32 +116,13 @@ const AIHelper = ({
              baseUrl: MODEL_CONFIGS[modelConfig.provider]?.baseUrl
          });
 
-         const basePrompt = `
-             You are an AI assistant that generates node setups for a computational framework.
-             * '*' represents AND (mod 2)
-             * '+' represents XOR (mod 2)
-             * Each node has a q value
+         const fullPrompt = `
+             ${basePrompt}
 
              Current setup:
              \`\`\`json
              ${JSON.stringify(context, null, 2)}
              \`\`\`
-
-             Instructions:
-             1. Create a node setup based on the user's request.
-             2. Return ONLY valid JSON inside a code block (\`\`\`json ... \`\`\`). No extra text.
-             3. The JSON should contain 'nodes' (array of nodes) and 'connections' (array of connections).
-             4. Each node object must have:
-                 * 'id': A unique identifier string.
-                 * 'type': String, can only be "input", "output", or "operation".
-                 * 'operation': Required string with '+' or '*' for "operation" types (only for operation nodes).
-             5.  Each connection object must have:
-                 *   'sourceId': The id of the connection source.
-                 *   'targetId': The id of the connection target.
-                 *    'inputName': The name of the input on the target node (e.g., "a", "b").
-             6. Operation nodes need to take input from other nodes. Use unique names as inputs.
-             7. The 'formula' for an 'operation' node should reference the input names (e.g., "a * b").
-             8. Always create connections between the input nodes and the operation node, and from the operation node to the output node.
 
              User Request: ${prompt}
          `;
@@ -164,7 +147,7 @@ const AIHelper = ({
                      model: modelConfig.model,
                      messages: [
                          { role: "system", content: "You are an AI assistant that generates node setups..." },
-                         { role: "user", content: basePrompt }
+                         { role: "user", content: fullPrompt }
                      ]
                  };
                  break;
@@ -173,7 +156,7 @@ const AIHelper = ({
                  endpoint = `${MODEL_CONFIGS.GEMINI.baseUrl}/models/${modelConfig.model}:generateContent`;
                  payload = {
                      contents: [{
-                         parts: [{ text: basePrompt }]
+                         parts: [{ text: fullPrompt }]
                      }]
                  };
                  break;
@@ -184,7 +167,7 @@ const AIHelper = ({
                      model: modelConfig.model,
                      messages: [
                          { role: "system", content: "You are an AI assistant that generates node setups..." },
-                         { role: "user", content: basePrompt }
+                         { role: "user", content: fullPrompt }
                      ]
                  };
                  break;
@@ -352,67 +335,81 @@ const AIHelper = ({
        }
 
        try {
-         // Create a mapping from the preview node id (which may be like "input1_preview_0") to a new unique id.
-         const previewIdToNewId = {};
-         const newNodes = [];
+         // Create a mapping from preview IDs to new IDs
+         const idMapping = new Map();
+         const createdNodes = [];
 
-         // Loop over each preview node, enrich it with defaults if necessary, and assign a new unique id.
-         for (let i = 0; i < previewNodes.length; i++) {
-           const preview = previewNodes[i];
-
-           // Generate a new unique id.
+         // First pass: Create all nodes and build ID mapping
+         for (const previewNode of previewNodes) {
            const newId = generateUniqueId();
-           previewIdToNewId[preview.id] = newId;
+           idMapping.set(previewNode.id, newId);
 
-           // Enrich the node:
            const enrichedNode = {
-             ...preview,
+             ...previewNode,
              id: newId,
-             // Ensure we have a proper name. (If the AI output was incomplete, fallback to the preview id.)
-             name: preview.name || preview.id,
-             // If no position was provided, assign a default based on the index.
-             position: preview.position || { x: 100 + (i % 3) * 350, y: 100 + Math.floor(i / 3) * 250 },
-             // If no inputs were provided, assign defaults.
-             inputs: preview.inputs || (
-               preview.type === "operation"
-                 ? { a: { value: 0, isConnected: false }, b: { value: 0, isConnected: false } }
-                 : { value: 0, isConnected: false }
-             ),
-             // If no formula, use a default (for operations use "a * b", otherwise "q")
-             formula: preview.formula || (preview.type === "operation" ? "a * b" : "q"),
-             // For operation nodes, if the operation string is missing, default to "*"
-             operation: preview.type === "operation" ? (preview.operation || "*") : undefined,
+             name: previewNode.name || `Node ${newId}`,
+             position: previewNode.position || {
+               x: 100 + (createdNodes.length % 3) * 350,
+               y: 100 + Math.floor(createdNodes.length / 3) * 250
+             },
+             inputs: {},
+             formula: previewNode.formula || '',
              useMod2: true,
              q: 0,
-             error: ""
+             error: ''
            };
 
-           // Insert the node using createNode.
-           // IMPORTANT: Make sure your ComputationalFramework's createNode function is updated
-           // so that if a node object is provided as an argument, it inserts that node directly
-           // (instead of generating a new blank node).
+           // Initialize inputs based on node type
+           if (previewNode.type === "operation") {
+             enrichedNode.inputs = {
+               a: { value: 0, isConnected: false },
+               b: { value: 0, isConnected: false }
+             };
+           } else {
+             enrichedNode.inputs = { value: 0, isConnected: false };
+           }
+
            await createNode(enrichedNode);
-           newNodes.push(enrichedNode);
+           createdNodes.push(enrichedNode);
          }
 
-         // Now process the connections: remap the connection source and target ids to the new id values.
+         // Second pass: Create connections using the new IDs
          if (parsedResponse.connections && Array.isArray(parsedResponse.connections)) {
-           for (const conn of parsedResponse.connections) {
-             const newSourceId = previewIdToNewId[conn.sourceId];
-             const newTargetId = previewIdToNewId[conn.targetId];
+           for (const connection of parsedResponse.connections) {
+             const newSourceId = idMapping.get(connection.sourceId);
+             const newTargetId = idMapping.get(connection.targetId);
+
              if (newSourceId && newTargetId) {
-               createConnection(newSourceId, newTargetId, conn.inputName);
+               // Make sure the input exists on the target node
+               const targetNode = createdNodes.find(n => n.id === newTargetId);
+               if (targetNode && targetNode.inputs && connection.inputName in targetNode.inputs) {
+                 await createConnection(newSourceId, newTargetId, connection.inputName);
+
+                 // Update the target node's input connection status
+                 const updatedNode = {
+                   ...targetNode,
+                   inputs: {
+                     ...targetNode.inputs,
+                     [connection.inputName]: {
+                       ...targetNode.inputs[connection.inputName],
+                       isConnected: true
+                     }
+                   }
+                 };
+
+                 await updateNode(newTargetId, updatedNode);
+               }
              }
            }
          }
 
-         toast.success(`Created ${newNodes.length} nodes`);
+         toast.success(`Created ${createdNodes.length} nodes with connections`);
          setPreviewNodes(null);
        } catch (error) {
          console.error("Failed to apply preview:", error);
          toast.error(`Failed to apply preview: ${error.message}`);
        }
-     }, [previewNodes, createNode, createConnection, response]);
+     }, [previewNodes, createNode, createConnection, updateNode, response]);
 
      const handleToggleView = () => {
          setShowJson(!showJson);

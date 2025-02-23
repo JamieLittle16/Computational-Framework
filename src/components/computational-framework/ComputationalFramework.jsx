@@ -4,7 +4,7 @@ const generateUniqueId = () => {
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, Wand, X } from 'lucide-react'; // Added Wand
+import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, Wand, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ComputationalNode from './ComputationalNode';
 import SettingsPanel from './SettingsPanel';
@@ -12,8 +12,8 @@ import * as math from 'mathjs';
 import styles from "./ComputationalFramework.module.css";
 import { isEqual } from 'lodash';
 import hsvToRgb from '@/utils/colourUtils';
-import AIHelper from './AIHelper'; // Import AIHelper
-import { Toaster } from 'sonner';
+import AIHelper from './AIHelper';
+import { Toaster, toast } from 'sonner';
 
 const ComputationalFramework = () => {
     const [nodes, setNodes] = useState([]);
@@ -43,15 +43,12 @@ const ComputationalFramework = () => {
     });
     const connectionsRef = useRef(connections);
     const settingsRef = useRef(settings);
-    // Store dependency regex for reuse
     const [dependencyRegex, setDependencyRegex] = useState(null);
     const [cachedDependencyGraph, setCachedDependencyGraph] = useState(null);
     const [cachedNodes, setCachedNodes] = useState(null);
     const [inputTimeoutIds, setInputTimeoutIds] = useState(new Map());
+    const [showAIHelper, setShowAIHelper] = useState(false);
 
-    const [showAIHelper, setShowAIHelper] = useState(false); // AI Helper state
-
-    //Update refs
     useEffect(() => {
         nodesRef.current = nodes;
     }, [nodes]);
@@ -64,15 +61,12 @@ const ComputationalFramework = () => {
         settingsRef.current = settings;
     }, [settings]);
 
-     // Generate and update the regex for dependencies only when node names change
     useEffect(() => {
-         const nodeNames = nodes.map(node => node.name.replace(/ /g, '_'));
-         const regex = new RegExp(`\\b(${nodeNames.join('|')})\\b\\s*\\(`, 'g');
-         setDependencyRegex(regex);
+        const nodeNames = nodes.map(node => node.name.replace(/ /g, '_'));
+        const regex = new RegExp(`\\b(${nodeNames.join('|')})\\b\\s*\\(`, 'g');
+        setDependencyRegex(regex);
     }, [nodes]);
 
-
-    // Optimized dependency extraction using pre-compiled regex
     const extractNodeDependencies = useCallback((formula, allNodes) => {
         if (!dependencyRegex) return [];
         const dependencies = [];
@@ -84,8 +78,7 @@ const ComputationalFramework = () => {
         return dependencies.map(name => allNodes.find(n => n.name.replace(/ /g, '_') === name)?.id).filter(id => id);
     }, [dependencyRegex]);
 
-
-      const buildDependencyGraph = useCallback(() => {
+    const buildDependencyGraph = useCallback(() => {
         const graph = new Map();
         const inDegree = new Map();
 
@@ -130,16 +123,14 @@ const ComputationalFramework = () => {
         }
 
         return sortedOrder;
-      }, [extractNodeDependencies]); // Only rebuild when extract changes
+      }, [extractNodeDependencies]);
 
-    // Create a reusable scope object
     const createEvaluationScope = useCallback((node, allNodes, connections, settings) => {
         const scope = {
              q: node.q,
              Q: node.q,
             ...math
         };
-         // Add inputs to scope
         Object.entries(node.inputs).forEach(([inputName, input]) => {
             if (input.isConnected) {
               const connection = connections.find(c =>
@@ -152,21 +143,17 @@ const ComputationalFramework = () => {
                 scope[inputName] = input.value;
             }
         });
-         // Add node references
-            allNodes.forEach(n => {
-             const sanitizedName = n.name.replace(/ /g, '_');
-             scope[sanitizedName] = () => {
-               const targetNode = allNodes.find(nn => nn.id === n.id);
-               return targetNode ? targetNode.q : 0;
-             };
-           });
+        allNodes.forEach(n => {
+         const sanitizedName = n.name.replace(/ /g, '_');
+         scope[sanitizedName] = () => {
+           const targetNode = allNodes.find(nn => nn.id === n.id);
+           return targetNode ? targetNode.q : 0;
+         };
+       });
         return scope;
     }, []);
 
-
-
     const evaluateNodeFormula = useCallback((node, scope, settings) => {
-
       let result;
       try {
          result = math.evaluate(node.formula, scope);
@@ -186,12 +173,12 @@ const ComputationalFramework = () => {
             setNodes(prevNodes =>
                 prevNodes.map(node => node.id === id ? updatedNode : node)
             );
-            setCachedDependencyGraph(null); // Invalidate graph cache
+            setCachedDependencyGraph(null);
         } catch (error) {
             console.error("Error updating node:", error);
         }
     }, []);
-    // Evaluate nodes only when necessary
+
     const evaluateAllNodes = useCallback(() => {
         const currentNodes = nodesRef.current.map(node => ({ ...node }));
         const currentConnections = [...connectionsRef.current];
@@ -214,7 +201,6 @@ const ComputationalFramework = () => {
              if (!node) return;
 
              const scope = createEvaluationScope(node, updatedNodes, currentConnections, currentSettings);
-
 
                 let newQ, error = '';
                 try {
@@ -242,8 +228,6 @@ const ComputationalFramework = () => {
 
     }, [buildDependencyGraph, createEvaluationScope, evaluateNodeFormula, cachedDependencyGraph]);
 
-
-    // Evaluate nodes with a delay
     useEffect(() => {
        const timeoutId = setTimeout(evaluateAllNodes, settings.delay);
        return () => clearTimeout(timeoutId);
@@ -252,10 +236,8 @@ const ComputationalFramework = () => {
     const createNode = useCallback((nodeData = null) => {
       try {
         if (nodeData) {
-          // Case 1: Creating a node from AI or other predefined data
           const newNode = {
             ...nodeData,
-            // Ensure all required properties are present
             id: nodeData.id || `${nextNodeId}-${generateUniqueId()}`,
             name: nodeData.name || `Node ${nextNodeId}`,
             position: nodeData.position || {
@@ -271,13 +253,11 @@ const ComputationalFramework = () => {
 
           setNodes(prev => [...prev, newNode]);
 
-          // Update nextNodeId if necessary
           const idNumber = parseInt(newNode.id.split('-')[0], 10);
           if (!isNaN(idNumber)) {
             setNextNodeId(prev => Math.max(prev, idNumber + 1));
           }
         } else {
-          // Case 2: Creating a blank node from "Add Node" button
           if (!containerRef.current) throw new Error("Container ref is not valid.");
           const rect = containerRef.current.getBoundingClientRect();
           const centerX = (rect.width / 2) - 160 - offset.x;
@@ -298,7 +278,7 @@ const ComputationalFramework = () => {
           setNextNodeId(prev => prev + 1);
         }
 
-        setCachedDependencyGraph(null); // Invalidate graph cache
+        setCachedDependencyGraph(null);
       } catch (error) {
         console.error("Error creating node:", error);
         toast.error(`Failed to create node: ${error.message}`);
@@ -339,14 +319,14 @@ const ComputationalFramework = () => {
                 reader.onload = (e) => {
                     try {
                         const setup = JSON.parse(e.target.result);
-                         setNodes(setup.nodes.mapReact.FC(n => ({
+                         setNodes(setup.nodes.map(n => ({
                             ...n,
                             error: n.error || ''
                           })));
                         setConnections(setup.connections);
                         setNextNodeId(setup.nextNodeId);
                         setOffset({ x: 0, y: 0 });
-                         setCachedDependencyGraph(null); // Invalidate graph cache
+                         setCachedDependencyGraph(null);
                         if (setup.settings) {
                             setSettings(setup.settings);
                         }
@@ -404,7 +384,7 @@ const ComputationalFramework = () => {
             setConnections(prevConns =>
                 prevConns.filter(conn => conn.sourceId !== id && conn.targetId !== id)
             );
-             setCachedDependencyGraph(null); // Invalidate graph cache
+             setCachedDependencyGraph(null);
         } catch (error) {
             console.error("Error deleting node:", error);
         }
@@ -423,7 +403,6 @@ const ComputationalFramework = () => {
             console.error("Error duplicating node:", error);
         }
     }, [nextNodeId]);
-
 
     const copySelectedNodes = useCallback(() => {
         try{
@@ -456,7 +435,7 @@ const ComputationalFramework = () => {
 
             setNodes(prevNodes => [...prevNodes, ...newNodes]);
             setNextNodeId(prevId => prevId + newNodes.length);
-             setCachedDependencyGraph(null); // Invalidate graph cache
+             setCachedDependencyGraph(null);
         } catch (error) {
             console.error("Error pasting node:", error);
         }
@@ -474,30 +453,39 @@ const ComputationalFramework = () => {
         }
     }, [selectedNodes, deleteNode]);
 
-    const createConnection = useCallback((sourceId, targetId, inputName) => {
-        try {
-            setConnections(prevConns => {
-                const newConns = prevConns.filter(conn =>
-                    !(conn.targetId === targetId && conn.inputName === inputName)
-                );
-                return [...newConns, { sourceId, targetId, inputName }];
-            });
+     const createConnection = useCallback((sourceId, targetId, inputName) => {
+      try {
+        // Remove any existing connections to this input
+        setConnections(prevConns => {
+          const newConns = prevConns.filter(conn =>
+            !(conn.targetId === targetId && conn.inputName === inputName)
+          );
+          return [...newConns, { sourceId, targetId, inputName }];
+        });
 
-            setNodes(prevNodes => prevNodes.map(node => {
-                if (node.id === targetId) {
-                    return {
-                        ...node,
-                        inputs: {
-                            ...node.inputs,
-                            [inputName]: { ...node.inputs[inputName], isConnected: true }
-                        }
-                    };
+        // Update the target node's input connection status
+        setNodes(prevNodes => prevNodes.map(node => {
+          if (node.id === targetId) {
+            return {
+              ...node,
+              inputs: {
+                ...node.inputs,
+                [inputName]: {
+                  ...node.inputs[inputName],
+                  isConnected: true
                 }
-                return node;
-            }));
-        } catch (error) {
-            console.error("Error creating connection:", error)
-        }
+              }
+            };
+          }
+          return node;
+        }));
+
+        // Invalidate dependency graph cache
+        setCachedDependencyGraph(null);
+      } catch (error) {
+        console.error("Error creating connection:", error);
+        toast.error(`Failed to create connection: ${error.message}`);
+      }
     }, []);
 
     const deleteSelectedConnections = useCallback(() => {
@@ -509,12 +497,11 @@ const ComputationalFramework = () => {
                     return !connectionsToDelete.includes(connectionString);
                 });
             });
-            setSelectedConnections(new Set()); // Clear selection after deleting connections
+            setSelectedConnections(new Set());
         } catch (error) {
             console.error("Error deleting selected connections", error);
         }
     }, [selectedConnections]);
-
 
     const updateNodeQ = useCallback((id, newQ) => {
         try {
@@ -720,7 +707,6 @@ const ComputationalFramework = () => {
         }
     };
 
-
     const handlePositionChange = useCallback((id, pos) => {
         try {
             if (!selectedNodes.has(id)) {
@@ -764,7 +750,6 @@ const ComputationalFramework = () => {
             onMouseLeave={handleMouseUp}
         >
             <Toaster richColors />
-            {/* Squared background that moves with panning */}
             <div
                 className="absolute inset-0 bg-repeat"
                 style={{
@@ -773,7 +758,6 @@ const ComputationalFramework = () => {
                     transform: `translate(${offset.x % 20}px, ${offset.y % 20}px)`
                 }}
             />
-            {/* UI Buttons (fixed relative to the screen) */}
              <div className="absolute top-4 left-4 z-10 flex gap-2">
                 <Button onClick={createNode} className="flex items-center gap-2">
                     <Plus className="h-4 w-4" />
@@ -812,7 +796,6 @@ const ComputationalFramework = () => {
                 />
             </div>
 
-            {/* AI Helper Button (top right) */}
             <div className="absolute top-4 right-4 z-10">
                 <Button onClick={handleAIHelperToggle} className="flex items-center gap-2">
                     <Wand className="h-4 w-4" />
@@ -820,7 +803,6 @@ const ComputationalFramework = () => {
                 </Button>
             </div>
 
-            {/* Workspace (moves relative to the screen) */}
             <div
                 className="absolute"
                 style={{
@@ -829,7 +811,6 @@ const ComputationalFramework = () => {
                 }}
                 ref={boundaryRef}
             >
-                {/* Nodes (fixed relative to the workspace) */}
                 {nodes.map(node => (
                     <ComputationalNode
                         key={node.id}
@@ -853,8 +834,7 @@ const ComputationalFramework = () => {
                 ))}
             </div>
 
-             {/* Connections (fixed relative to the screen) */}
-            <svg
+             <svg
                 className="absolute top-0 left-0 w-full h-full pointer-events-none"
                 style={{ zIndex: 1 }}
             >
@@ -863,7 +843,6 @@ const ComputationalFramework = () => {
                     const targetNode = nodes.find(n => n.id === conn.targetId);
                     if (!sourceNode || !targetNode) return null;
 
-                    // Calculate positions relative to the screen
                     const sourceX = sourceNode.position.x + 320 + offset.x;
                     const sourceY = sourceNode.position.y + 64 + offset.y;
                     const targetX = targetNode.position.x + offset.x;
@@ -915,7 +894,6 @@ const ComputationalFramework = () => {
                 })}
             </svg>
 
-            {/* Selection Box (fixed relative to the screen) */}
             {selectionBox && (
                 <div
                     className="absolute border border-blue-500 bg-blue-100 bg-opacity-20"
@@ -935,6 +913,7 @@ const ComputationalFramework = () => {
                     settings={settings}
                     createNode={createNode}
                     createConnection={createConnection}
+                    updateNode={updateNode}
                     onClose={() => setShowAIHelper(false)}
                 />
             )}
