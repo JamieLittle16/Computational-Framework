@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
-// import PreviewCard from './PreviewCard';
 import ComputationalNode from './ComputationalNode';
 import basePrompt from './basePrompt'; // Import the base prompt
 
@@ -268,6 +267,7 @@ const AIHelper = ({
           }
 
           setIsLoading(true);
+          let toastId;
           try {
               const context = {
                   nodes: allNodes,
@@ -275,7 +275,7 @@ const AIHelper = ({
                   settings: settings,
               };
 
-              toast.loading("Generating node setup...");
+              toastId = toast.loading("Generating node setup...");
               const aiResponse = await callAI(prompt, context);
 
               setResponse(JSON.stringify(aiResponse, null, 2));
@@ -298,6 +298,7 @@ const AIHelper = ({
               } else {
                 setPreviewNodes(null);
               }
+              toast.success("Node setup generated!", { id: toastId }); // Resolve loading toast
           } catch (error) {
               console.error("AI Interaction Error:", error);
               console.error("Full error context:", {
@@ -305,7 +306,7 @@ const AIHelper = ({
                   model: modelConfig?.model,
                   prompt: prompt.substring(0, 100) + "..."
               });
-              toast.error(error.message);
+              toast.error(error.message, { id: toastId }); // Resolve loading toast with error
               setResponse("Error Response:\n" + error.message);
           } finally {
               setIsLoading(false);
@@ -328,8 +329,10 @@ const AIHelper = ({
               toast.error("Failed to parse AI response to apply connections.");
               return;
           }
-
+          let toastId;
           try {
+              toastId = toast.loading("Applying node setup...");
+
               // Create a mapping from preview IDs to new IDs
               const idMapping = new Map();
               const createdNodes = [];
@@ -398,11 +401,11 @@ const AIHelper = ({
                   }
               }
 
-              toast.success(`Created ${createdNodes.length} nodes with connections`);
+              toast.success(`Created ${createdNodes.length} nodes with connections`, { id: toastId });
               setPreviewNodes(null);
           } catch (error) {
               console.error("Failed to apply preview:", error);
-              toast.error(`Failed to apply preview: ${error.message}`);
+              toast.error(`Failed to apply preview: ${error.message}`, { id: toastId });
           }
      }, [previewNodes, createNode, createConnection, updateNode, response]);
 
