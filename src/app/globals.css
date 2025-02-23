@@ -82,3 +82,14 @@ body {
 .selected-node {
   border: 2px solid #3b82f6;
 }
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

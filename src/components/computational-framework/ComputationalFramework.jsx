@@ -1,13 +1,19 @@
+const generateUniqueId = () => {
+  return '_' + Math.random().toString(36).substr(2, 9);
+};
+
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, X } from 'lucide-react';
+import { Copy, Edit2, MoreVertical, Plus, Save, Settings2, Trash, Upload, Wand, X } from 'lucide-react'; // Added Wand
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ComputationalNode from './ComputationalNode';
 import SettingsPanel from './SettingsPanel';
 import * as math from 'mathjs';
 import styles from "./ComputationalFramework.module.css";
 import { isEqual } from 'lodash';
-import hsvToRgb from '@/utils/colourUtils'
+import hsvToRgb from '@/utils/colourUtils';
+import AIHelper from './AIHelper'; // Import AIHelper
+import { Toaster } from 'sonner';
 
 const ComputationalFramework = () => {
     const [nodes, setNodes] = useState([]);
@@ -42,6 +48,8 @@ const ComputationalFramework = () => {
     const [cachedDependencyGraph, setCachedDependencyGraph] = useState(null);
     const [cachedNodes, setCachedNodes] = useState(null);
     const [inputTimeoutIds, setInputTimeoutIds] = useState(new Map());
+
+    const [showAIHelper, setShowAIHelper] = useState(false); // AI Helper state
 
     //Update refs
     useEffect(() => {
@@ -241,33 +249,61 @@ const ComputationalFramework = () => {
        return () => clearTimeout(timeoutId);
     }, [evaluateAllNodes, settings.delay]);
 
-    const createNode = useCallback(() => {
-        try {
-            const container = containerRef.current;
-            if (!container) throw new Error("Container ref is not valid.");
+    const createNode = useCallback((nodeData = null) => {
+      try {
+        if (nodeData) {
+          // Case 1: Creating a node from AI or other predefined data
+          const newNode = {
+            ...nodeData,
+            // Ensure all required properties are present
+            id: nodeData.id || `${nextNodeId}-${generateUniqueId()}`,
+            name: nodeData.name || `Node ${nextNodeId}`,
+            position: nodeData.position || {
+              x: 100,
+              y: 100
+            },
+            inputs: nodeData.inputs || {},
+            formula: nodeData.formula || '',
+            useMod2: nodeData.hasOwnProperty('useMod2') ? nodeData.useMod2 : true,
+            q: nodeData.hasOwnProperty('q') ? nodeData.q : settings.initialQ,
+            error: nodeData.error || ''
+          };
 
-            const rect = container.getBoundingClientRect();
+          setNodes(prev => [...prev, newNode]);
 
-            const centerX = (rect.width / 2) - 160 - offset.x;
-            const centerY = (rect.height / 2) - 100 - offset.y;
+          // Update nextNodeId if necessary
+          const idNumber = parseInt(newNode.id.split('-')[0], 10);
+          if (!isNaN(idNumber)) {
+            setNextNodeId(prev => Math.max(prev, idNumber + 1));
+          }
+        } else {
+          // Case 2: Creating a blank node from "Add Node" button
+          if (!containerRef.current) throw new Error("Container ref is not valid.");
+          const rect = containerRef.current.getBoundingClientRect();
+          const centerX = (rect.width / 2) - 160 - offset.x;
+          const centerY = (rect.height / 2) - 100 - offset.y;
 
-            const newNode = {
-                id: nextNodeId,
-                position: { x: centerX, y: centerY },
-                inputs: {},
-                formula: '',
-                useMod2: true,
-                q: settings.initialQ,
-                name: `Node ${nextNodeId}`,
-                error: ''
-            };
-            setNodes(prevNodes => [...prevNodes, newNode]);
-            setNextNodeId(prevId => prevId + 1);
-            setCachedDependencyGraph(null); // Invalidate graph cache
-        } catch (error) {
-            console.error("Error creating node:", error);
+          const newNode = {
+            id: `${nextNodeId}-${generateUniqueId()}`,
+            position: { x: centerX, y: centerY },
+            inputs: {},
+            formula: '',
+            useMod2: true,
+            q: settings.initialQ,
+            name: `Node ${nextNodeId}`,
+            error: ''
+          };
+
+          setNodes(prev => [...prev, newNode]);
+          setNextNodeId(prev => prev + 1);
         }
-    }, [nextNodeId, offset, settings.initialQ]);
+
+        setCachedDependencyGraph(null); // Invalidate graph cache
+      } catch (error) {
+        console.error("Error creating node:", error);
+        toast.error(`Failed to create node: ${error.message}`);
+      }
+    }, [containerRef, offset, settings.initialQ, nextNodeId]);
 
     const saveSetup = () => {
         try {
@@ -714,6 +750,10 @@ const ComputationalFramework = () => {
         };
     }, [copySelectedNodes, pasteCopiedNodes, deleteSelectedNodes, deleteSelectedConnections]);
 
+    const handleAIHelperToggle = useCallback(() => {
+        setShowAIHelper(prev => !prev);
+    }, []);
+
     return (
         <div
             ref={containerRef}
@@ -723,6 +763,7 @@ const ComputationalFramework = () => {
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
         >
+            <Toaster richColors />
             {/* Squared background that moves with panning */}
             <div
                 className="absolute inset-0 bg-repeat"
@@ -733,7 +774,7 @@ const ComputationalFramework = () => {
                 }}
             />
             {/* UI Buttons (fixed relative to the screen) */}
-            <div className="absolute top-4 left-4 z-10 flex gap-2">
+             <div className="absolute top-4 left-4 z-10 flex gap-2">
                 <Button onClick={createNode} className="flex items-center gap-2">
                     <Plus className="h-4 w-4" />
                     Add Node
@@ -771,6 +812,14 @@ const ComputationalFramework = () => {
                 />
             </div>
 
+            {/* AI Helper Button (top right) */}
+            <div className="absolute top-4 right-4 z-10">
+                <Button onClick={handleAIHelperToggle} className="flex items-center gap-2">
+                    <Wand className="h-4 w-4" />
+                    AI Helper
+                </Button>
+            </div>
+
             {/* Workspace (moves relative to the screen) */}
             <div
                 className="absolute"
@@ -797,7 +846,7 @@ const ComputationalFramework = () => {
                         updateNodeQ={updateNodeQ}
                         isSelected={selectedNodes.has(node.id)}
                         onSelect={handleNodeSelect}
-                         handleInputChange = {handleNodeInputChange}
+                        handleInputChange={handleNodeInputChange}
                         settings={settings}
                         onDragStart={handleNodeDragStart}
                     />
@@ -876,6 +925,17 @@ const ComputationalFramework = () => {
                         width: selectionBox.width,
                         height: selectionBox.height,
                     }}
+                />
+            )}
+
+            {showAIHelper && (
+                <AIHelper
+                    allNodes={nodes}
+                    connections={connections}
+                    settings={settings}
+                    createNode={createNode}
+                    createConnection={createConnection}
+                    onClose={() => setShowAIHelper(false)}
                 />
             )}
         </div>
