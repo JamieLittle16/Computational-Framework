@@ -53,22 +53,22 @@ const ComputationalNode = React.memo(({
 
 
   // Connection handling
-    const handleConnectionStart = useCallback((e) => {
+  const handleConnectionStart = (e) => {
     e.stopPropagation();
-    e.dataTransfer.setData('sourceNodeId', node.id.toString());
-    }, [node.id]);
+    e.dataTransfer.setData('sourceNodeId', node.id);
+  };
 
-    const handleInputDrop = useCallback((e, inputName) => {
+  const handleInputDrop = (e, inputName) => {
     e.preventDefault();
     try {
-        const sourceNodeId = parseInt(e.dataTransfer.getData('sourceNodeId'));
-        if (sourceNodeId !== node.id) {
-            createConnection(sourceNodeId, node.id, inputName);
-        }
+      const sourceNodeId = e.dataTransfer.getData('sourceNodeId');
+      if (sourceNodeId && sourceNodeId !== node.id) {
+        createConnection(sourceNodeId, node.id, inputName);
+      }
     } catch (error) {
-        console.error("Error during input drop:", error);
+      console.error("Error during input drop:", error);
     }
-  }, [createConnection, node.id]);
+  };
 
     const handleInputFocus = useCallback((e) => {
     e.stopPropagation();

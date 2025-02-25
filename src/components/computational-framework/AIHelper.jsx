@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import ComputationalNode from './ComputationalNode';
-import basePrompt from './basePrompt'; // Import the base prompt
+import basePrompt from './basePrompt';
 
 const MODEL_CONFIGS = {
     OPENAI: {
@@ -27,10 +27,7 @@ const MODEL_CONFIGS = {
         name: 'Google Gemini',
         models: [
             'gemini-pro',
-            'gemini-pro-lite',
-            'gemini-2.0-flash',
-            'gemini-2.0-flash-lite',
-            'gemini-2.0-flash-thinking'
+            'gemini-2.0-flash'
         ],
         baseUrl: 'https://generativelanguage.googleapis.com/v1'
     },
@@ -51,18 +48,19 @@ const AIHelper = ({
     createNode,
     createConnection,
     updateNode,
-    onClose
+    onClose,
+    offset, // Receive the offset from the main component
+    transformNode,
 }) => {
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [response, setResponse] = useState('');
-    const [selectedProvider, setSelectedProvider] = useState(Object.keys(MODEL_CONFIGS)[0]); // Track selected provider
+    const [selectedProvider, setSelectedProvider] = useState(Object.keys(MODEL_CONFIGS)[0]);
     const [modelConfig, setModelConfig] = useState(() => {
         const savedConfigs = localStorage.getItem('aiModelConfigs');
         if (savedConfigs) {
             try {
                 const parsedConfigs = JSON.parse(savedConfigs);
-                // Validate and return specific config for the selected provider, or fallback to default
                 const provider = parsedConfigs[selectedProvider] ? selectedProvider : Object.keys(MODEL_CONFIGS)[0];
                 const model = parsedConfigs[provider]?.model || MODEL_CONFIGS[provider].models[0];
                 const apiKey = parsedConfigs[provider]?.apiKey || '';
@@ -93,7 +91,6 @@ const AIHelper = ({
             }
         }
 
-        // Update localStorage with the individual API key for the selected provider
         const updatedConfigs = {
             ...parsedConfigs,
             [modelConfig.provider]: {
@@ -583,11 +580,13 @@ const AIHelper = ({
                                                   }}
                                               >
                                                   <ComputationalNode
-                                                  node={node}
-                                                  connections = {connections}
-                                                  allNodes = {allNodes}
-                                                  settings = {settings}
-                                                  createConnection={createConnection}
+                                                      node={node}
+                                                      connections={connections}
+                                                      allNodes={allNodes}
+                                                      settings={settings}
+                                                      createConnection={createConnection}
+                                                      offset={offset} // Pass the offset here
+                                                      transformNode={transformNode} // Pass the transformNode function
                                                   />
                                               </div>
                                           ))}

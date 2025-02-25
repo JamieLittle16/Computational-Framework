@@ -260,12 +260,18 @@ const ComputationalFramework = () => {
         } else {
           if (!containerRef.current) throw new Error("Container ref is not valid.");
           const rect = containerRef.current.getBoundingClientRect();
-          const centerX = (rect.width / 2) - 160 - offset.x;
-          const centerY = (rect.height / 2) - 100 - offset.y;
+
+          // Calculate center position relative to the viewport
+          // Adjust position calculation
+          const centerX = (rect.width / 2 - 160); // 160 is half the node width
+          const centerY = (rect.height / 2 - 100); // 100 is half the node height
 
           const newNode = {
             id: `${nextNodeId}-${generateUniqueId()}`,
-            position: { x: centerX, y: centerY },
+            position: {
+              x: centerX - offset.x,
+              y: centerY - offset.y
+            },
             inputs: {},
             formula: '',
             useMod2: true,
