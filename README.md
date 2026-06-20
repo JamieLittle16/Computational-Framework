@@ -1,182 +1,178 @@
-# Computational Framework — Node-based arithmetic graphs with per-node modular arithmetic
+# Computational Framework
 
-This project provides an interactive, node-based system for composing mathematical operations into graphs. Nodes can be connected to form complex computations, including cyclic graphs (loops). A key concept is per-node modular arithmetic: each node can independently enable or disable modular reduction with its own modulus.
+> An interactive node-based editor for composing mathematical operations into computation graphs, with per-node modular arithmetic and AI-assisted node generation.
 
-At a glance
-- Node graph of arithmetic primitives (compose to build complex pipelines)
-- Loops supported (cyclic graphs), not just DAGs
-- Per-node modular arithmetic (enable/disable; choose modulus per node)
-- Built as a TypeScript/Next.js app with Tailwind CSS for UI
+**[Live Demo](https://computational-framework.vercel.app)** · [Report a bug](https://github.com/JamieLittle16/Computational-Framework/issues)
 
-Contents
-- Overview
-- Core concepts
-- Modular arithmetic semantics
-- Graph execution model
-- Project structure
-- Getting started
-- Using the editor
-- Extending the system (adding new nodes)
-- Notes on technology
-- FAQ
-- License
+---
 
-Overview
---------
+## Features
 
-Computational Framework is a visual and programmatic way to describe arithmetic computations as a graph:
+| Feature | Description |
+|---------|-------------|
+| **Visual node editor** | Drag-and-drop canvas with pan (middle-click / alt-drag) and zoom (Ctrl+scroll) |
+| **Arithmetic formulas** | Each node evaluates any [mathjs](https://mathjs.org) expression — `a + b`, `floor(sqrt(q))`, etc. |
+| **Per-node modular arithmetic** | Toggle modulo reduction per node with a configurable base (default: mod 2) |
+| **Cyclic graphs** | Loops are supported; the `q` variable exposes each node's own previous value for feedback |
+| **Animated connections** | Wires show animated flow direction with arrowheads |
+| **Undo / Redo** | Full undo/redo stack (Ctrl+Z / Ctrl+Shift+Z) with 50-snapshot history |
+| **Dark mode** | One-click toggle; persists via `localStorage` |
+| **Node palette** | Create Computational or Logger nodes from a typed palette |
+| **Logger node** | Clock-triggered input logger — records values on every rising edge |
+| **AI node generator** | Describe a computation in plain English; GPT-4, Gemini, or DeepSeek generates the graph |
+| **Save / Load** | Export and re-import graphs as JSON |
+| **Minimap** | Birds-eye view of the graph in the bottom-right corner |
+| **Demo graph** | A half-adder circuit loads automatically on first visit |
 
-- Each node performs a small mathematical operation (e.g., constant, add, subtract, multiply, divide, modulo, and other arithmetic/utility operations).
-- Nodes have access to all mathmatical operations included in mathjs.
-- Edges connect node outputs to inputs, allowing you to build pipelines or feedback loops.
-- Each node can optionally operate under modular arithmetic with its own modulus. Turning modular arithmetic off for a node makes it operate with standard integer arithmetic.
+---
 
-Core concepts
--------------
+## Getting started
 
-- Node
-  - A unit of computation with typed inputs and outputs.
-  - Has configuration, including a flag to enable modular arithmetic and, if enabled, the modulus value M.
-- Ports
-  - Inputs and outputs on nodes. Connections (edges) route values between ports.
-- Edge
-  - Connects an output port of one node to an input port of another.
-- Graph
-  - A collection of nodes and edges. May be acyclic (DAG) or contain cycles (loops).
+### Prerequisites
 
-Modular arithmetic semantics
-----------------------------
+- **Node.js 18+**
+- npm (included with Node) or an alternative package manager
 
-- Per-node toggle
-  - modEnabled=false: the node performs ordinary integer arithmetic.
-  - modEnabled=true, modulus=M: the node reduces its computed value modulo M.
-- Typical flow
-  - Inputs arrive to a node. The node applies its operation to produce a result.
-  - If modular arithmetic is enabled, the result is reduced modulo M before it’s emitted on outputs.
-- Practical notes
-  - If a node’s operation is not well-defined under a given modulus (e.g., division), the behavior depends on the node’s specific implementation. Common patterns include integer division when modular arithmetic is disabled, and modular inverse–based semantics if implemented for enabled modular arithmetic. Check the node’s configuration/editor hints for the precise rule used.
+### Install and run
 
-Graph execution model
----------------------
-
-- Acyclic graphs (DAGs)
-  - Evaluated in topological order; values flow from sources (e.g., constants) through edges to sinks.
-- Cyclic graphs (loops)
-  - Loops are permitted. In cyclic graphs, values typically evolve over “steps” or iterative updates.
-  - If a node requires an initial value for a feedback path, provide it in the node configuration (or via dedicated state/memory-style nodes if available).
-  - The UI may offer controls to step, run, or reset an execution so you can observe steady-state or time-evolving behavior.
-
-Project structure
------------------
-
-Repository layout (key paths observed in this repository):
-
-- src/app — Next.js application routes/pages and app bootstrap
-- src/components — React components for the UI (node editor, panels, controls, forms)
-- src/lib — Core logic and helpers for graph/nodes/execution
-- src/utils — Utility functions shared across the app
-- src/types.ts — Shared TypeScript types for nodes, edges, ports, configuration, and results
-- public — Static assets (icons, images, etc.)
-- next.config.ts — Next.js configuration
-- tailwind.config.ts, postcss.config.mjs — Tailwind and PostCSS configuration
-- package.json, package-lock.json — Project metadata and scripts
-- eslint.config.mjs — Lint configuration
-- .gitignore — Git ignore rules
-
-Getting started
----------------
-
-Prerequisites
-- Node.js 18+ recommended
-- npm (ships with Node) or an alternative package manager
-
-Install and run
 ```bash
 git clone https://github.com/JamieLittle16/Computational-Framework.git
 cd Computational-Framework
-
-# Install dependencies
 npm install
-
-# Start the development server
-npm run dev
-# Open the app in your browser (usually http://localhost:3000)
+npm run dev          # → http://localhost:3000
 ```
 
-Build for production
+### Production build
+
 ```bash
 npm run build
-npm run start
+npm start
 ```
 
-Lint (if configured)
+### Run tests
+
 ```bash
-npm run lint
+npm test             # run once
+npm run test:watch   # watch mode
+npm run test:coverage
 ```
 
-Using the editor
-----------------
-
-- Add nodes: Use the UI to place arithmetic nodes (e.g., constants, add, subtract) onto the canvas.
-- Connect nodes: Drag from an output port to an input port to route values.
-- Configure nodes:
-  - Enable/disable modular arithmetic per node.
-  - Set the modulus M when modular arithmetic is enabled.
-  - Provide any node-specific parameters (e.g., constant values).
-- Evaluate:
-  - For DAGs, results propagate immediately based on connections.
-  - For cyclic graphs, use step/run controls (if present) to iterate the computation. Configure initial values for feedback paths as needed.
-
-Extending the system (adding new nodes)
----------------------------------------
-
-A typical pattern to add a new node type:
-
-1. Define the operation
-   - Add the node’s core compute logic and metadata under src/lib (e.g., node kind, input/output arity, config schema).
-   - Ensure the compute function respects per-node modular settings:
-     - If modEnabled, reduce the result modulo M.
-     - If modDisabled, perform standard integer arithmetic.
-
-2. Define types
-   - Add or extend TypeScript types in src/types.ts so the new node integrates with the graph system (ports, config, validation).
-
-3. Add a UI component
-   - Create a React component in src/components for the node’s visual representation and configuration form (e.g., toggles, sliders, inputs).
-
-4. Register the node
-   - Add the new node to whatever registry/factory the app uses to discover available node types so it appears in the editor’s palette.
-
-5. Test
-   - Create example graphs that include the new node (both with modular arithmetic on and off), and verify its behavior in DAGs and loops.
-
-Notes on technology
--------------------
-
-- Framework: Next.js (TypeScript) for the web application.
-- Styling: Tailwind CSS (tailwind.config.ts present).
-- UI primitives: The repository includes a components.json, which typically accompanies a modern React UI component pipeline.
-- Types: Centralized in src/types.ts for nodes, edges, and configuration.
-- Static assets: Served from public/.
-
-FAQ
 ---
 
-- How does modular arithmetic interact with inputs?
-  - Nodes compute their result and then apply reduction modulo M if modular arithmetic is enabled for that node.
+## AI Helper setup
 
-- Can I mix modular and non-modular nodes in the same graph?
-  - Yes. Each node’s modular behavior is independent. You can connect nodes with modular arithmetic to nodes without it and vice versa.
+The AI node generator calls AI providers **server-side** — your API keys are never sent from the browser to the AI providers directly.
 
-- Are loops allowed?
-  - Yes. Loops are supported. Use step/run controls and provide initial values where necessary to ensure well-defined behavior.
+To use a pre-configured key (e.g. for a live demo), set environment variables:
 
-License
--------
+```bash
+# .env.local  (see .env.local.example for the full template)
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...
+DEEPSEEK_API_KEY=sk-...
+```
 
-MIT
+Users can also enter their own key in the AI Helper panel; it will be forwarded to the server proxy and used for that request only.
 
-Acknowledgements
-----------------
+---
 
-Thanks to contributors and library authors whose tools make the node editor and modular arithmetic engine possible.
+## Using the editor
+
+### Canvas navigation
+
+| Action | Gesture |
+|--------|---------|
+| Pan | Middle-click drag · Alt + left-drag |
+| Zoom | Ctrl/⌘ + scroll wheel |
+| Select node | Click |
+| Multi-select | Shift+click · Drag marquee |
+| Select connection | Click wire |
+
+### Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+C / Ctrl+V | Copy / Paste selected nodes |
+| Delete / Backspace | Delete selected nodes or connections |
+| Ctrl+Z | Undo |
+| Ctrl+Shift+Z / Ctrl+Y | Redo |
+
+### Creating nodes
+
+- **Add Node** — places a default Computational node at the canvas centre
+- **Node Types** — opens the palette to choose between Computational and Logger nodes
+- **AI Helper** — describe what you want in natural language
+
+### Writing formulas
+
+Formulas are evaluated by [mathjs](https://mathjs.org). Available in scope:
+
+- All standard inputs by name: `a`, `b`, `x`, etc.
+- `q` / `Q` — current node value (enables feedback loops)
+- Any other node by name: `Node_A()`, `Sum()`
+- Math built-ins: `abs`, `sqrt`, `floor`, `sin`, `pi`, `e`, …
+
+**Boolean / logic (mod 2):**
+
+```
++  →  XOR   (addition mod 2)
+*  →  AND   (multiplication mod 2)
+```
+
+Example — D flip-flop:
+```
+a * (q + b) + q
+```
+
+---
+
+## Architecture
+
+```
+src/
+├── app/
+│   ├── page.tsx                    ← root page (wraps in ErrorBoundary)
+│   └── api/ai/route.ts             ← server-side AI proxy
+├── components/
+│   ├── ErrorBoundary.tsx
+│   └── computational-framework/
+│       ├── ComputationalFramework.tsx   ← canvas + hook composition (~225 LOC)
+│       ├── ComputationalNode.tsx        ← thin wrapper around BaseNode
+│       ├── BaseNode.tsx                 ← shared node card (header, inputs, drag)
+│       ├── LoggerNode.tsx               ← clock-triggered logger
+│       ├── AIHelper.tsx                 ← AI generation modal
+│       ├── NodePalette.tsx              ← node type picker sidebar
+│       ├── ShortcutsPanel.tsx           ← keyboard shortcuts reference
+│       ├── Minimap.tsx                  ← birds-eye canvas view
+│       └── SettingsPanel.tsx            ← framework settings sheet
+├── hooks/
+│   ├── useNodes.ts          ← node state, CRUD, evaluation
+│   ├── useConnections.ts    ← connection state & CRUD
+│   ├── useCanvas.ts         ← pan, zoom, drag, selection
+│   ├── useKeyboard.ts       ← keyboard shortcuts
+│   └── useUndoRedo.ts       ← undo/redo snapshot stack
+└── lib/
+    ├── evaluationEngine.ts  ← pure evaluation logic (testable)
+    ├── nodeRegistry.ts      ← node type descriptors
+    └── demoGraph.ts         ← first-visit half-adder demo
+```
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router, Turbopack) |
+| Language | TypeScript 5 (strict) |
+| Styling | Tailwind CSS + shadcn/ui (Radix primitives) |
+| Math engine | mathjs |
+| Testing | Vitest (26 unit tests) |
+| Toasts | Sonner |
+| State | React hooks (no external state library) |
+
+---
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

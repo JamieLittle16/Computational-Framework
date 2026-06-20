@@ -6,14 +6,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Prevent text selection globally */
-* {
-  user-select: none; /* Non-standard syntax for older browsers */
-  -webkit-user-select: none; /* Safari */
-  -moz-user-select: none; /* Firefox */
-  -ms-user-select: none; /* Internet Explorer/Edge */
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -42,6 +34,7 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -68,28 +61,18 @@ body {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
-}
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-.selected-node {
-  border: 2px solid #3b82f6;
-}
-
-
-
-@layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Node drag handle — only suppress text selection on node cards while interacting */
+.node-drag-handle {
+  user-select: none;
+  -webkit-user-select: none;
 }

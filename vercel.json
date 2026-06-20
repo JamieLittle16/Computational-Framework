@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "env": {
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key — used server-side as a default for the AI Helper. Users can override with their own key in the UI.",
+      "required": false
+    },
+    "GEMINI_API_KEY": {
+      "description": "Google Gemini API key — used server-side as a default for the AI Helper.",
+      "required": false
+    },
+    "DEEPSEEK_API_KEY": {
+      "description": "DeepSeek API key — used server-side as a default for the AI Helper.",
+      "required": false
+    }
+  }
+}
