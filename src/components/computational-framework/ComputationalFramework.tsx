@@ -46,9 +46,7 @@ const ComputationalFramework: React.FC = () => {
     // Dark mode — initialise from storage on client mount, then react to changes
     useEffect(() => {
         const stored = localStorage.getItem('theme');
-        const prefersDark = stored
-            ? stored === 'dark'
-            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const prefersDark = stored === 'dark';
         setIsDark(prefersDark);
         setDarkReady(true);
     }, []);
